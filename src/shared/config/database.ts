@@ -7,7 +7,6 @@ const prisma = new PrismaClient({
     : ['error'],
 });
 
-// Test de conexión
 async function testConnection() {
   try {
     await prisma.$connect();
@@ -20,9 +19,15 @@ async function testConnection() {
 
 testConnection();
 
-// Manejo de shutdown
-process.on('beforeExit', async () => {
+// Shutdown limpio en SIGINT (Ctrl+C) y SIGTERM (Docker/PM2)
+process.on('SIGINT', async () => {
   await prisma.$disconnect();
+  process.exit(0);
+});
+
+process.on('SIGTERM', async () => {
+  await prisma.$disconnect();
+  process.exit(0);
 });
 
 export default prisma;

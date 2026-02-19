@@ -1,4 +1,4 @@
-// Prisma Schema para Sistema de Tickets
+// prisma/schema.prisma
 
 generator client {
   provider = "prisma-client-js"
@@ -17,6 +17,7 @@ model Usuario {
   id            String    @id @default(uuid())
   email         String    @unique
   nombre        String
+  telefono      String?
   agencia       String?
   googleId      String?   @unique
   rol           Rol       @default(USUARIO)
@@ -40,24 +41,32 @@ enum Rol {
 // ============================================
 
 model Evento {
-  id                String    @id @default(uuid())
-  titulo            String
-  descripcion       String?
-  fecha             DateTime
-  hora              String
-  ubicacion         String
-  imagenUrl         String?
-  capacidad         Int
-  precio            Float
-  activo            Boolean   @default(true)
-  createdAt         DateTime  @default(now())
-  updatedAt         DateTime  @updatedAt
+  id          String       @id @default(uuid())
+  titulo      String
+  descripcion String?
+  fecha       DateTime
+  hora        String
+  ubicacion   String
+  imagenUrl   String?
+  capacidad   Int
+  precio      Float
+  estado      EstadoEvento @default(ACTIVO)
+  activo      Boolean      @default(true)
+  createdAt   DateTime     @default(now())
+  updatedAt   DateTime     @updatedAt
 
   // Relaciones
-  asientos          Asiento[]
-  compras           Compra[]
+  asientos    Asiento[]
+  compras     Compra[]
 
   @@map("eventos")
+}
+
+enum EstadoEvento {
+  ACTIVO
+  PAUSADO
+  FINALIZADO
+  CANCELADO
 }
 
 // ============================================
@@ -65,22 +74,29 @@ model Evento {
 // ============================================
 
 model Asiento {
-  id              String    @id @default(uuid())
-  eventoId        String
-  fila            String
-  numero          Int
-  ocupado         Boolean   @default(false)
-  reservadoEn     DateTime?
-  createdAt       DateTime  @default(now())
-  updatedAt       DateTime  @updatedAt
+  id          String        @id @default(uuid())
+  eventoId    String
+  fila        String
+  numero      Int
+  estado      EstadoAsiento @default(DISPONIBLE)
+  reservadoEn DateTime?
+  createdAt   DateTime      @default(now())
+  updatedAt   DateTime      @updatedAt
 
   // Relaciones
-  evento          Evento    @relation(fields: [eventoId], references: [id], onDelete: Cascade)
-  compra          Compra?
+  evento      Evento        @relation(fields: [eventoId], references: [id], onDelete: Cascade)
+  compra      Compra?
 
   @@unique([eventoId, fila, numero])
   @@index([eventoId])
   @@map("asientos")
+}
+
+enum EstadoAsiento {
+  DISPONIBLE
+  RESERVANDO
+  VENDIDO
+  BLOQUEADO
 }
 
 // ============================================
@@ -93,9 +109,12 @@ model Compra {
   eventoId        String
   asientoId       String        @unique
   monto           Float
+  moneda          String        @default("USD")
+  metodoPago      String?
   estadoPago      EstadoPago    @default(PENDIENTE)
   stripePaymentId String?       @unique
   qrCode          String        @unique
+  qrCodeUsado     Boolean       @default(false)
   certificadoUrl  String?
   createdAt       DateTime      @default(now())
   updatedAt       DateTime      @updatedAt
@@ -123,15 +142,17 @@ enum EstadoPago {
 // ============================================
 
 model Asistencia {
-  id              String    @id @default(uuid())
-  compraId        String    @unique
-  usuarioId       String
-  ingresoEn       DateTime  @default(now())
-  validadoPor     String?   // Admin que escaneó
+  id            String   @id @default(uuid())
+  compraId      String   @unique
+  usuarioId     String
+  ingresoEn     DateTime @default(now())
+  validadoPor   String?
+  ubicacionGPS  String?
+  dispositivoId String?
 
   // Relaciones
-  compra          Compra    @relation(fields: [compraId], references: [id], onDelete: Cascade)
-  usuario         Usuario   @relation(fields: [usuarioId], references: [id], onDelete: Cascade)
+  compra        Compra   @relation(fields: [compraId], references: [id], onDelete: Cascade)
+  usuario       Usuario  @relation(fields: [usuarioId], references: [id], onDelete: Cascade)
 
   @@map("asistencias")
 }
@@ -141,14 +162,25 @@ model Asistencia {
 // ============================================
 
 model Reembolso {
-  id              String    @id @default(uuid())
-  compraId        String    @unique
-  monto           Float
-  razon           String
-  stripeRefundId  String?   @unique
-  aprobado        Boolean   @default(false)
-  createdAt       DateTime  @default(now())
-  updatedAt       DateTime  @updatedAt
+  id             String         @id @default(uuid())
+  compraId       String         @unique
+  monto          Float
+  razon          String
+  estado         EstadoReembolso @default(SOLICITADO)
+  stripeRefundId String?        @unique
+  aprobado       Boolean        @default(false)
+  solicitadoEn   DateTime       @default(now())
+  resolvedoEn    DateTime?
+  createdAt      DateTime       @default(now())
+  updatedAt      DateTime       @updatedAt
 
   @@map("reembolsos")
+}
+
+enum EstadoReembolso {
+  SOLICITADO
+  EN_REVISION
+  APROBADO
+  RECHAZADO
+  PROCESADO
 }

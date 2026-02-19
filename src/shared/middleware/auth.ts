@@ -4,40 +4,47 @@ import jwt from 'jsonwebtoken';
 import prisma from '../config/database';
 
 export interface AuthRequest extends Request {
-  user?: {
-    id: string;
-    email: string;
-    rol: string;
-  };
+  user?: Express.User;
 }
 
 export const authenticate = async (
   req: AuthRequest,
   res: Response,
   next: NextFunction
-) => {
+): Promise<void> => {  // ← tipo de retorno explícito
   try {
     const token = req.headers.authorization?.replace('Bearer ', '');
 
     if (!token) {
-      return res.status(401).json({ error: 'No autorizado - Token no proporcionado' });
+      res.status(401).json({ error: 'No autorizado - Token no proporcionado' });
+      return;  // ← return sin valor después de res
     }
 
-    const decoded = jwt.verify(token, process.env.JWT_SECRET || 'secret') as any;
+    const decoded = jwt.verify(token, process.env.JWT_SECRET || 'secret') as { id: string };
 
     const user = await prisma.usuario.findUnique({
       where: { id: decoded.id },
-      select: { id: true, email: true, rol: true }
+      select: { id: true, email: true, rol: true, nombre: true, telefono: true, agencia: true }
     });
 
     if (!user) {
-      return res.status(401).json({ error: 'Usuario no encontrado' });
+      res.status(401).json({ error: 'Usuario no encontrado' });
+      return;
     }
 
-    req.user = user;
+    req.user = {
+      id: user.id,
+      email: user.email,
+      rol: user.rol,
+    };
+
     next();
   } catch (error) {
-    return res.status(401).json({ error: 'Token inválido' });
+    if (error instanceof jwt.TokenExpiredError) {
+      res.status(401).json({ error: 'Token expirado' });
+      return;
+    }
+    res.status(401).json({ error: 'Token inválido' });
   }
 };
 
@@ -45,9 +52,16 @@ export const adminOnly = async (
   req: AuthRequest,
   res: Response,
   next: NextFunction
-) => {
-  if (req.user?.rol !== 'ADMIN') {
-    return res.status(403).json({ error: 'Acceso denegado - Se requiere rol de admin' });
+): Promise<void> => {  // ← tipo de retorno explícito
+  if (!req.user) {
+    res.status(401).json({ error: 'No autorizado - Debe estar autenticado' });
+    return;
   }
+
+  if (req.user.rol !== 'ADMIN') {
+    res.status(403).json({ error: 'Acceso denegado - Se requiere rol de admin' });
+    return;
+  }
+
   next();
 };

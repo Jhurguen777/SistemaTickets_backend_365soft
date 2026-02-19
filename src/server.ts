@@ -1,5 +1,5 @@
 // src/server.ts
-import express, { Express } from 'express';
+import express, { Express, Request, Response, NextFunction } from 'express';
 import { createServer } from 'http';
 import { Server } from 'socket.io';
 import cors from 'cors';
@@ -7,6 +7,7 @@ import dotenv from 'dotenv';
 import { createAdapter } from '@socket.io/redis-adapter';
 import { redisClient, redisPub, redisSub } from './shared/config/redis';
 import { setupSocketHandlers } from './sockets/seatSocket';
+import passport from './modules/auth/passport.config';
 import authRoutes from './modules/auth/auth.routes';
 import eventoRoutes from './modules/eventos/eventos.routes';
 import asientoRoutes from './modules/asientos/asientos.routes';
@@ -30,13 +31,13 @@ const io = new Server(httpServer, {
   transports: ['websocket', 'polling'],
 });
 
-// Conectar Redis Adapter para escalabilidad horizontal
+// Redis Adapter para escalabilidad horizontal
 if (process.env.REDIS_URL) {
   io.adapter(createAdapter(redisPub, redisSub));
   console.log('✅ Socket.IO Redis Adapter configurado');
 }
 
-// Middleware
+// ── MIDDLEWARES ───────────────────────────────────────────────
 app.use(cors({
   origin: [
     process.env.FRONTEND_URL || 'http://localhost:5173',
@@ -49,17 +50,23 @@ app.use(cors({
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
-// Health check
-app.get('/health', (req, res) => {
+// Passport sin sesiones (usamos JWT)
+app.use(passport.initialize());
+
+// ── HEALTH CHECK ─────────────────────────────────────────────
+const redisStatus = () => redisClient.isReady ? 'conectado' : 'desconectado';
+
+app.get('/health', (_req: Request, res: Response) => {
   res.json({
     status: 'OK',
     timestamp: new Date().toISOString(),
-    redis: redisClient.status,
-    uptime: process.uptime()
+    redis: redisStatus(),
+    uptime: process.uptime(),
+    version: process.env.npm_package_version || '1.0.0',
   });
 });
 
-// API Routes
+// ── API ROUTES ────────────────────────────────────────────────
 app.use('/api/auth', authRoutes);
 app.use('/api/eventos', eventoRoutes);
 app.use('/api/asientos', asientoRoutes);
@@ -68,33 +75,35 @@ app.use('/api/asistencia', asistenciaRoutes);
 app.use('/api/certificados', certificadoRoutes);
 app.use('/api/admin', adminRoutes);
 
-// Setup Socket.IO handlers
+// ── WEBSOCKETS ────────────────────────────────────────────────
 setupSocketHandlers(io);
 
-// Error handling
-app.use((err: any, req: any, res: any, next: any) => {
-  console.error('Error:', err);
+// ── ERROR HANDLER ─────────────────────────────────────────────
+app.use((err: Error & { status?: number }, _req: Request, res: Response, _next: NextFunction) => {
+  console.error('❌ Error:', err.message);
   res.status(err.status || 500).json({
-    error: err.message || 'Algo salió mal!',
-    ...(process.env.NODE_ENV === 'development' && { stack: err.stack })
+    error: err.message || 'Error interno del servidor',
+    ...(process.env.NODE_ENV === 'development' && { stack: err.stack }),
   });
 });
 
-// 404 handler
-app.use((req, res) => {
+// ── 404 ───────────────────────────────────────────────────────
+app.use((_req: Request, res: Response) => {
   res.status(404).json({ error: 'Ruta no encontrada' });
 });
 
+// ── INICIO ────────────────────────────────────────────────────
 const PORT = process.env.PORT || 3000;
 
 httpServer.listen(PORT, () => {
   console.log('╔══════════════════════════════════════════╗');
   console.log('║  🚀 SISTEMA DE TICKETS - BACKEND        ║');
   console.log('╠══════════════════════════════════════════╣');
-  console.log(`║  Puerto: ${PORT}                         ║`);
-  console.log(`║  Entorno: ${process.env.NODE_ENV || 'development'}                    ║`);
-  console.log(`║  Redis: ${redisClient.status}                        ║`);
-  console.log(`║  WebSocket: ✅ Listo                  ║`);
+  console.log(`║  Puerto:   ${PORT}                        ║`);
+  console.log(`║  Entorno:  ${process.env.NODE_ENV || 'development'}               ║`);
+  console.log(`║  Redis:    ${redisStatus()}               ║`);
+  console.log(`║  OAuth:    ✅ Google listo               ║`);
+  console.log(`║  WS:       ✅ Socket.IO listo            ║`);
   console.log('╚══════════════════════════════════════════╝');
 });
 
