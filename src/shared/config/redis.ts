@@ -36,3 +36,4 @@ redisPub.on('error', () => {});
 redisSub.on('error', () => {});
 
 export default redisClient;
+export {connectRedis };
