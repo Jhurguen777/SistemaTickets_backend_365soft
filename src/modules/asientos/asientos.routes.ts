@@ -1,15 +1,27 @@
-// src/modules/asientos/asientos.routes.ts
-import { Router } from 'express';
-import { authenticate } from '../../shared/middleware/auth';
+import { Router, Request, Response, NextFunction } from 'express';
+import { Server as SocketIOServer } from 'socket.io';
+import { authenticate as authMiddleware } from '../../shared/middleware/auth'; // ← alias
+import { getAsientosEvento, getAsiento, reservar, liberar } from './asientos.controller';
 
-const router = Router();
+// Inyecta la instancia de io en req para que los controllers puedan emitir eventos
+const injectIO = (io: SocketIOServer) =>
+  (req: Request & { io?: SocketIOServer }, _res: Response, next: NextFunction) => {
+    req.io = io;
+    next();
+  };
 
-router.get('/evento/:id', (_req, res) => {
-  res.json({ message: 'Obtener asientos del evento' });
-});
+// Uso en server.ts: app.use('/api/asientos', asientosRouter(io))
+export const asientosRouter = (io: SocketIOServer): Router => {
+  const router = Router();
+  const withIO = injectIO(io);
 
-router.post('/reservar', authenticate, (_req, res) => {
-  res.json({ message: 'Use WebSocket en su lugar' });
-});
+  // Todos los endpoints requieren JWT: Authorization: Bearer <token>
+  router.get('/evento/:eventoId', authMiddleware, getAsientosEvento);
+  router.get('/:id',              authMiddleware, getAsiento);
+  router.post('/reservar',        authMiddleware, withIO, reservar);
+  router.post('/liberar',         authMiddleware, withIO, liberar);
 
-export default router;
+  return router;
+};
+
+export default asientosRouter;
