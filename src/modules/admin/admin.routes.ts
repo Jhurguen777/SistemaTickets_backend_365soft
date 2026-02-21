@@ -1,23 +1,25 @@
 // src/modules/admin/admin.routes.ts
 import { Router } from 'express';
 import { authenticate, adminOnly } from '../../shared/middleware/auth';
+import {
+  getDashboard,
+  getSales,
+  getAttendance,
+  getAgencies,
+  exportData,
+} from './admin.controller';
 
 const router = Router();
 
-router.get('/dashboard', authenticate, adminOnly, (_req, res) => {
-  res.json({ message: 'Dashboard con métricas' });
-});
+// Dashboard
+router.get('/dashboard', authenticate, adminOnly, getDashboard);
 
-router.get('/reports/ventas', authenticate, adminOnly, (_req, res) => {
-  res.json({ message: 'Reporte de ventas' });
-});
+// Reportes
+router.get('/reports/ventas', authenticate, adminOnly, getSales);
+router.get('/reports/asistencia', authenticate, adminOnly, getAttendance);
+router.get('/reports/agencias', authenticate, adminOnly, getAgencies);
 
-router.get('/reports/asistencia', authenticate, adminOnly, (_req, res) => {
-  res.json({ message: 'Reporte de asistencia' });
-});
-
-router.get('/reports/agencias', authenticate, adminOnly, (_req, res) => {
-  res.json({ message: 'Reporte por agencia' });
-});
+// Exportación
+router.get('/export', authenticate, adminOnly, exportData);
 
 export default router;

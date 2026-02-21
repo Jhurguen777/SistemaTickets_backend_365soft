@@ -1,27 +1,29 @@
 // src/modules/eventos/eventos.routes.ts
 import { Router } from 'express';
 import { authenticate, adminOnly } from '../../shared/middleware/auth';
+import {
+  getAllEventos,
+  getEvento,
+  createEventoController,
+  updateEventoController,
+  deleteEventoController,
+} from './eventos.controller';
 
 const router = Router();
 
-router.get('/', (_req, res) => {
-  res.json({ message: 'Listar eventos' });
-});
+// Listar eventos (público)
+router.get('/', getAllEventos);
 
-router.get('/:id', (_req, res) => {
-  res.json({ message: 'Detalle de evento' });
-});
+// Obtener evento por ID (público)
+router.get('/:id', getEvento);
 
-router.post('/', authenticate, adminOnly, (_req, res) => {
-  res.json({ message: 'Crear evento' });
-});
+// Crear evento (solo admin)
+router.post('/', authenticate, adminOnly, createEventoController);
 
-router.put('/:id', authenticate, adminOnly, (_req, res) => {
-  res.json({ message: 'Actualizar evento' });
-});
+// Actualizar evento (solo admin)
+router.put('/:id', authenticate, adminOnly, updateEventoController);
 
-router.delete('/:id', authenticate, adminOnly, (_req, res) => {
-  res.json({ message: 'Eliminar evento' });
-});
+// Eliminar evento (solo admin)
+router.delete('/:id', authenticate, adminOnly, deleteEventoController);
 
 export default router;

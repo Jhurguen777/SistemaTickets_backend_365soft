@@ -47,17 +47,24 @@ model Evento {
   fecha       DateTime
   hora        String
   ubicacion   String
+  direccion   String?
   imagenUrl   String?
   capacidad   Int
   precio      Float
+  categoria   String       @default("Fiestas")
+  subcategoria String?
+  organizer   String?
+  doorsOpen   String?
   estado      EstadoEvento @default(ACTIVO)
   activo      Boolean      @default(true)
+  seatMapConfig Json?
   createdAt   DateTime     @default(now())
   updatedAt   DateTime     @updatedAt
 
   // Relaciones
   asientos    Asiento[]
   compras     Compra[]
+  sectores    SectorEvento[]
 
   @@map("eventos")
 }
@@ -67,6 +74,25 @@ enum EstadoEvento {
   PAUSADO
   FINALIZADO
   CANCELADO
+}
+
+// ============================================
+// SECTORES DE EVENTOS
+// ============================================
+
+model SectorEvento {
+  id          String   @id @default(uuid())
+  eventoId    String
+  nombre      String   // General, VIP, Super VIP
+  precio      Float
+  disponible  Int
+  total       Int
+  createdAt   DateTime @default(now())
+
+  // Relaciones
+  evento      Evento   @relation(fields: [eventoId], references: [id], onDelete: Cascade)
+
+  @@map("sectores_evento")
 }
 
 // ============================================
