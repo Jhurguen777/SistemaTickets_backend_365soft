@@ -100,33 +100,74 @@ enum EstadoAsiento {
 }
 
 // ============================================
+// PAGOS QR (Banco MC4)
+// ============================================
+
+model QrPagos {
+  id                String        @id @default(uuid())
+  alias             String        @unique
+  estado            EstadoQr      @default(PENDIENTE)
+  monto             Float
+  moneda            String        @default("BOB")
+  compraId          String?       @unique
+  fechaVencimiento  DateTime
+  imagenQr          String?
+  detalleGlosa      String?
+  numeroOrden       String?
+  nombreCliente     String?
+  documentoCliente  String?
+  cuentaCliente     String?
+  fechaproceso      DateTime?
+  createdAt         DateTime      @default(now())
+  updatedAt         DateTime      @updatedAt
+
+  // Relaciones
+  compra            Compra?
+
+  @@index([estado])
+  @@index([compraId])
+  @@map("qr_pagos")
+}
+
+enum EstadoQr {
+  PENDIENTE
+  PAGADO
+  CANCELADO
+  VENCIDO
+}
+
+// ============================================
 // COMPRAS
 // ============================================
 
 model Compra {
-  id              String        @id @default(uuid())
-  usuarioId       String
-  eventoId        String
-  asientoId       String        @unique
-  monto           Float
-  moneda          String        @default("USD")
-  metodoPago      String?
-  estadoPago      EstadoPago    @default(PENDIENTE)
-  stripePaymentId String?       @unique
-  qrCode          String        @unique
-  qrCodeUsado     Boolean       @default(false)
-  certificadoUrl  String?
-  createdAt       DateTime      @default(now())
-  updatedAt       DateTime      @updatedAt
+  id                String        @id @default(uuid())
+  usuarioId         String
+  eventoId          String
+  asientoId         String        @unique
+  monto             Float
+  moneda            String        @default("USD")
+  metodoPago        String?
+  estadoPago        EstadoPago    @default(PENDIENTE)
+  stripePaymentId   String?       @unique
+  qrPagoId          String?       @unique
+  qrPagoAlias       String?       @unique
+  qrCode            String        @unique
+  qrCodeUsado       Boolean       @default(false)
+  certificadoUrl    String?
+  createdAt         DateTime      @default(now())
+  updatedAt         DateTime      @updatedAt
 
   // Relaciones
-  usuario         Usuario       @relation(fields: [usuarioId], references: [id], onDelete: Cascade)
-  evento          Evento        @relation(fields: [eventoId], references: [id], onDelete: Cascade)
-  asiento         Asiento       @relation(fields: [asientoId], references: [id], onDelete: Cascade)
-  asistencia      Asistencia?
+  usuario           Usuario       @relation(fields: [usuarioId], references: [id], onDelete: Cascade)
+  evento            Evento        @relation(fields: [eventoId], references: [id], onDelete: Cascade)
+  asiento           Asiento       @relation(fields: [asientoId], references: [id], onDelete: Cascade)
+  qrPago            QrPagos?      @relation(fields: [qrPagoId], references: [id])
+  asistencia        Asistencia?
 
   @@index([usuarioId])
   @@index([eventoId])
+  @@index([estadoPago])
   @@map("compras")
 }
 
