@@ -2,9 +2,12 @@
 import { Router } from 'express';
 import passport from './passport.config';
 import { authenticate } from '../../shared/middleware/auth';
-import { googleCallback, completeProfile, getMe, logout } from './auth.controller';
+import { googleCallback, completeProfile, getMe, logout, loginLocal } from './auth.controller';
 
 const router = Router();
+
+// Login local (solo para desarrollo)
+router.post('/login', loginLocal);
 
 // Paso 1: Redirigir a Google — bypass de Passport para la redirección
 router.get('/google', (req, res) => {

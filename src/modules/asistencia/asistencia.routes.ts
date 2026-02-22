@@ -1,15 +1,31 @@
-// src/modules/asistencia/asistencia.routes.ts
-import { Router } from 'express';
-import { authenticate, adminOnly } from '../../shared/middleware/auth';
+import { Router } from "express";
+import { AsistenciaController } from "./asistencia.controller";
+import { authenticate, adminOnly } from "../../shared/middleware/auth";
 
 const router = Router();
+const controller = new AsistenciaController();
 
-router.post('/validar', authenticate, adminOnly, (_req, res) => {
-  res.json({ message: 'Validar QR de entrada' });
-});
+// POST /api/asistencia/verificar-qr
+// Verifica el QR y registra el ingreso al evento
+// Requiere: Admin autenticado
+router.post("/verificar-qr", authenticate, adminOnly, controller.verificarQR);
 
-router.get('/evento/:id', authenticate, adminOnly, (_req, res) => {
-  res.json({ message: 'Reporte de asistencia del evento' });
-});
+
+// GET /api/asistencia/evento/:eventoId
+// Retorna la lista de todos los asistentes de un evento
+// Requiere: Admin autenticado
+router.get("/evento/:eventoId", authenticate, adminOnly, controller.listarAsistentes);
+
+
+// GET /api/asistencia/stats/:eventoId
+// Retorna estadísticas de asistencia del evento
+// Requiere: Admin autenticado
+router.get("/stats/:eventoId", authenticate, adminOnly, controller.obtenerStats);
+
+
+// GET /api/asistencia/exportar/:eventoId
+// Exporta la lista de asistentes en formato Excel (.xlsx)
+// Requiere: Admin autenticado
+router.get("/exportar/:eventoId", authenticate, adminOnly, controller.exportarExcel);
 
 export default router;

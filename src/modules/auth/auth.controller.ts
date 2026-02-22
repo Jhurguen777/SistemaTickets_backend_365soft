@@ -7,6 +7,64 @@ import {
   needsProfileCompletion,
   getUserProfile,
 } from './auth.service';
+import prisma from '../../shared/config/database';
+
+// ── LOGIN LOCAL (SOLO PARA DESARROLLO) ─────────────────────
+export const loginLocal = async (req: AuthRequest, res: Response): Promise<void> => {
+  try {
+    const { email, password } = req.body;
+
+    if (!email || !password) {
+      res.status(400).json({ error: 'Email y contraseña son requeridos' });
+      return;
+    }
+
+    // Credenciales hardcodeadas para desarrollo
+    const ADMIN_EMAIL = 'administrador@gmail.com';
+    const ADMIN_PASSWORD = 'superadmin';
+
+    if (email === ADMIN_EMAIL && password === ADMIN_PASSWORD) {
+      // Buscar o crear usuario admin en la base de datos
+      let adminUser = await prisma.usuario.findUnique({
+        where: { email: ADMIN_EMAIL }
+      });
+
+      if (!adminUser) {
+        adminUser = await prisma.usuario.create({
+          data: {
+            email: ADMIN_EMAIL,
+            nombre: 'Administrador',
+            rol: 'ADMIN'
+          }
+        });
+      }
+
+      const token = generateAuthToken({
+        id: adminUser.id,
+        email: adminUser.email,
+        rol: adminUser.rol
+      });
+
+      res.json({
+        success: true,
+        message: 'Login exitoso',
+        token,
+        usuario: {
+          id: adminUser.id,
+          email: adminUser.email,
+          nombre: adminUser.nombre,
+          rol: adminUser.rol
+        }
+      });
+      return;
+    }
+
+    res.status(401).json({ error: 'Credenciales inválidas' });
+  } catch (error) {
+    console.error('❌ Error en loginLocal:', error);
+    res.status(500).json({ error: 'Error al iniciar sesión' });
+  }
+};
 
 // ── GOOGLE CALLBACK ──────────────────────────────────────────
 export const googleCallback = async (req: AuthRequest, res: Response): Promise<void> => {
