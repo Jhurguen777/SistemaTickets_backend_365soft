@@ -26,6 +26,8 @@ export interface CreateEventoData {
   organizer?: string;
   doorsOpen?: string;
   estado?: string;
+  permitirMultiplesAsientos?: boolean;
+  limiteAsientosPorUsuario?: number;
   sectores?: Array<{
     nombre: string;
     precio: number;
@@ -50,6 +52,8 @@ export interface UpdateEventoData {
   doorsOpen?: string;
   estado?: string;
   activo?: boolean;
+  permitirMultiplesAsientos?: boolean;
+  limiteAsientosPorUsuario?: number;
   seatMapConfig?: any;
   sectores?: Array<{
     nombre: string;
@@ -210,6 +214,8 @@ export const createEvento = async (data: CreateEventoData) => {
       organizer: data.organizer,
       doorsOpen: data.doorsOpen,
       estado: (data.estado || 'ACTIVO') as any,
+      permitirMultiplesAsientos: data.permitirMultiplesAsientos || false,
+      limiteAsientosPorUsuario: data.limiteAsientosPorUsuario || 1,
       seatMapConfig: data.seatMapConfig || null,
       sectores: data.sectores ? {
         create: data.sectores.map(sector => ({
@@ -266,8 +272,13 @@ export const updateEvento = async (id: string, data: UpdateEventoData) => {
 
   // Si se proporcionan sectores, eliminar los anteriores y crear los nuevos
   if (data.sectores) {
-    // Eliminar sectores existentes
+    // Eliminar sectores existentes y también los asientos
     await prisma.sectorEvento.deleteMany({
+      where: { eventoId: id }
+    });
+
+    // Eliminar todos los asientos del evento
+    await prisma.asiento.deleteMany({
       where: { eventoId: id }
     });
   }
@@ -291,6 +302,8 @@ export const updateEvento = async (id: string, data: UpdateEventoData) => {
       ...(data.doorsOpen !== undefined && { doorsOpen: data.doorsOpen }),
       ...(data.estado && { estado: data.estado as any }),
       ...(data.activo !== undefined && { activo: data.activo }),
+      ...(data.permitirMultiplesAsientos !== undefined && { permitirMultiplesAsientos: data.permitirMultiplesAsientos }),
+      ...(data.limiteAsientosPorUsuario !== undefined && { limiteAsientosPorUsuario: data.limiteAsientosPorUsuario }),
       ...(data.seatMapConfig !== undefined && { seatMapConfig: data.seatMapConfig }),
       ...(data.sectores && {
         sectores: {
@@ -333,6 +346,77 @@ export const updateEvento = async (id: string, data: UpdateEventoData) => {
       }
     }
   });
+
+  // Si se proporcionó seatMapConfig, crear los asientos individuales
+  if (data.seatMapConfig && data.sectores) {
+    const config = data.seatMapConfig as any;
+    const sectoresCreados = evento.sectores;
+
+    // Mapear sectores por su nombre para obtener el ID
+    const sectoresMap = new Map();
+    sectoresCreados.forEach(sector => {
+      const configSector = config.sectors.find((s: any) => s.name === sector.nombre);
+      if (configSector) {
+        sectoresMap.set(configSector.id, sector.id);
+      }
+    });
+
+    // Crear asientos para cada fila
+    const asientosACrear: Array<{
+      fila: string;
+      numero: number;
+      precio: number;
+      estado: 'DISPONIBLE' | 'RESERVANDO' | 'VENDIDO' | 'BLOQUEADO';
+      sectorId: string;
+      eventoId: string;
+    }> = [];
+
+    // Procesar filas
+    for (const row of config.rows || []) {
+      const sectorIdConfig = row.sectorId;
+      const sectorIdReal = sectoresMap.get(sectorIdConfig);
+
+      if (!sectorIdReal) continue;
+
+      // Crear asientos para esta fila
+      for (let i = 0; i < row.seats; i++) {
+        // El número es un entero secuencial (1, 2, 3...)
+        const numeroAsiento = i + 1;
+
+        // Verificar si hay un asiento especial para este asiento
+        const specialSeat = config.specialSeats?.find((s: any) =>
+          s.rowId === row.id && s.seatIndex === i
+        );
+
+        // Obtener precio del asiento especial o del sector
+        const precio = specialSeat?.price || sectoresCreados.find(s => s.id === sectorIdReal)?.precio || evento.precio;
+
+        // Obtener estado del asiento especial o por defecto DISPONIBLE
+        let estado: 'DISPONIBLE' | 'RESERVANDO' | 'VENDIDO' | 'BLOQUEADO' = 'DISPONIBLE';
+        if (specialSeat?.status === 'sold') estado = 'VENDIDO';
+        else if (specialSeat?.status === 'reserved') estado = 'RESERVANDO';
+
+        asientosACrear.push({
+          fila: row.name,
+          numero: numeroAsiento,
+          precio,
+          estado,
+          sectorId: sectorIdReal,
+          eventoId: id
+        });
+      }
+    }
+
+    // Crear todos los asientos en lote
+    if (asientosACrear.length > 0) {
+      await prisma.asiento.createMany({
+        data: asientosACrear,
+        skipDuplicates: true
+      });
+
+      console.log(`✅ Creados ${asientosACrear.length} asientos para el evento ${id}`);
+    }
+  }
 
   return evento;
 };

@@ -17,10 +17,13 @@ model Usuario {
   id            String    @id @default(uuid())
   email         String    @unique
   nombre        String
+  apellido      String?
+  password      String?
   telefono      String?
   agencia       String?
   googleId      String?   @unique
   rol           Rol       @default(USUARIO)
+  activo        Boolean   @default(true)
   createdAt     DateTime  @default(now())
   updatedAt     DateTime  @updatedAt
 
@@ -41,30 +44,32 @@ enum Rol {
 // ============================================
 
 model Evento {
-  id          String       @id @default(uuid())
-  titulo      String
-  descripcion String?
-  fecha       DateTime
-  hora        String
-  ubicacion   String
-  direccion   String?
-  imagenUrl   String?
-  capacidad   Int
-  precio      Float
-  categoria   String       @default("Fiestas")
-  subcategoria String?
-  organizer   String?
-  doorsOpen   String?
-  estado      EstadoEvento @default(ACTIVO)
-  activo      Boolean      @default(true)
-  seatMapConfig Json?
-  createdAt   DateTime     @default(now())
-  updatedAt   DateTime     @updatedAt
+  id                             String                @id @default(uuid())
+  titulo                         String
+  descripcion                    String?
+  fecha                          DateTime
+  hora                           String
+  ubicacion                      String
+  direccion                      String?
+  imagenUrl                      String?
+  capacidad                      Int
+  precio                         Float
+  categoria                      String                @default("Fiestas")
+  subcategoria                   String?
+  organizer                      String?
+  doorsOpen                      String?
+  estado                         EstadoEvento         @default(ACTIVO)
+  activo                         Boolean               @default(true)
+  seatMapConfig                  Json?
+  permitirMultiplesAsientos      Boolean               @default(false)
+  limiteAsientosPorUsuario       Int                   @default(1)
+  createdAt                      DateTime              @default(now())
+  updatedAt                      DateTime              @updatedAt
 
   // Relaciones
-  asientos    Asiento[]
-  compras     Compra[]
-  sectores    SectorEvento[]
+  asientos                       Asiento[]
+  compras                        Compra[]
+  sectores                       SectorEvento[]
 
   @@map("eventos")
 }

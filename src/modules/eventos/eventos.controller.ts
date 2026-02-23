@@ -72,9 +72,13 @@ export const createEventoController = async (req: AuthRequest, res: Response): P
       message: 'Evento creado exitosamente',
       data: evento
     });
-  } catch (error) {
+  } catch (error: any) {
     console.error('❌ Error al crear evento:', error);
-    res.status(500).json({ error: 'Error al crear evento' });
+    res.status(500).json({
+      error: 'Error al crear evento',
+      message: error.message,
+      details: process.env.NODE_ENV === 'development' ? error.stack : undefined
+    });
   }
 };
 

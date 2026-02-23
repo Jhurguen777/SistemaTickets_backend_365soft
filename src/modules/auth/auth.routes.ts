@@ -2,9 +2,12 @@
 import { Router } from 'express';
 import passport from './passport.config';
 import { authenticate } from '../../shared/middleware/auth';
-import { googleCallback, completeProfile, getMe, logout, loginLocal } from './auth.controller';
+import { googleCallback, completeProfile, getMe, logout, loginLocal, register } from './auth.controller';
 
 const router = Router();
+
+// Registro local
+router.post('/register', register);
 
 // Login local (solo para desarrollo)
 router.post('/login', loginLocal);

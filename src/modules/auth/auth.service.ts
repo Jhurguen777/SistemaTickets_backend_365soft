@@ -1,6 +1,7 @@
 // src/modules/auth/auth.service.ts
 import prisma from '../../shared/config/database';
 import { generateToken } from '../../shared/utils/jwt';
+import bcrypt from 'bcrypt';
 
 export interface CompleteProfileData {
   telefono: string;
@@ -86,6 +87,7 @@ export const getUserProfile = async (userId: string) => {
         id: true,
         email: true,
         nombre: true,
+        apellido: true,
         telefono: true,
         agencia: true,
         rol: true,
@@ -103,5 +105,63 @@ export const getUserProfile = async (userId: string) => {
   } catch (error) {
     console.error('❌ Error al obtener perfil:', error);
     throw new Error('Error al obtener información del usuario');
+  }
+};
+
+/**
+ * Registrar nuevo usuario local
+ */
+export const registerLocal = async (data: {
+  email: string;
+  password: string;
+  nombre: string;
+  apellido?: string;
+}) => {
+  try {
+    // Verificar si el email ya existe
+    const existingUser = await prisma.usuario.findUnique({
+      where: { email: data.email }
+    });
+
+    if (existingUser) {
+      throw new Error('El email ya está registrado');
+    }
+
+    // Hashear la contraseña
+    const hashedPassword = await bcrypt.hash(data.password, 10);
+
+    // Crear usuario
+    const usuario = await prisma.usuario.create({
+      data: {
+        email: data.email,
+        password: hashedPassword,
+        nombre: data.nombre,
+        apellido: data.apellido || null,
+        rol: 'USUARIO'
+      },
+      select: {
+        id: true,
+        email: true,
+        nombre: true,
+        apellido: true,
+        rol: true,
+        createdAt: true
+      }
+    });
+
+    // Generar token
+    const token = generateAuthToken({
+      id: usuario.id,
+      email: usuario.email,
+      rol: usuario.rol
+    });
+
+    return {
+      usuario,
+      token
+    };
+  } catch (error) {
+    console.error('❌ Error en registro:', error);
+    throw error;
   }
 };

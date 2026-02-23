@@ -6,8 +6,51 @@ import {
   completeUserProfile,
   needsProfileCompletion,
   getUserProfile,
+  registerLocal as registerUserService,
 } from './auth.service';
 import prisma from '../../shared/config/database';
+
+// ── REGISTRO LOCAL ────────────────────────────────────────────
+export const register = async (req: AuthRequest, res: Response): Promise<void> => {
+  try {
+    const { email, password, nombre, apellido } = req.body;
+
+    // Validaciones
+    if (!email || !password || !nombre) {
+      res.status(400).json({ error: 'Email, contraseña y nombre son requeridos' });
+      return;
+    }
+
+    if (password.length < 6) {
+      res.status(400).json({ error: 'La contraseña debe tener al menos 6 caracteres' });
+      return;
+    }
+
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+      res.status(400).json({ error: 'Email inválido' });
+      return;
+    }
+
+    // Registrar usuario
+    const result = await registerUserService({ email, password, nombre, apellido });
+
+    res.status(201).json({
+      success: true,
+      message: 'Usuario registrado exitosamente',
+      token: result.token,
+      usuario: result.usuario
+    });
+  } catch (error: any) {
+    console.error('❌ Error en registro:', error);
+
+    if (error.message === 'El email ya está registrado') {
+      res.status(409).json({ error: 'El email ya está registrado' });
+      return;
+    }
+
+    res.status(500).json({ error: error.message || 'Error al registrar usuario' });
+  }
+};
 
 // ── LOGIN LOCAL (SOLO PARA DESARROLLO) ─────────────────────
 export const loginLocal = async (req: AuthRequest, res: Response): Promise<void> => {

@@ -8,11 +8,9 @@ import bancoQrUtil from '../../shared/utils/banco-qr.util';
 import {
   IniciarPagoRequest,
   IniciarPagoResponse,
-  QrGeneradoResponse,
   VerificarPagoResponse,
   CompraConDetalles,
-  PagoQrError,
-  EstadoQr as EstadoQrEnum
+  PagoQrError
 } from './types';
 
 const prisma = new PrismaClient();
@@ -186,7 +184,7 @@ class ComprasService {
       const estadoAnterior = qrPago.estado;
       const estadoNuevo = responseBanco.objeto.estadoActual;
 
-      qrPago = await prisma.qrPagos.update({
+      const qrPagoActualizado = await prisma.qrPagos.update({
         where: { id: qrId },
         data: {
           estado: estadoNuevo as EstadoQr,
@@ -203,7 +201,7 @@ class ComprasService {
       // 5. Si el estado cambió a PAGADO, procesar el pago
       let pagoProcesado = false;
       if (estadoNuevo === 'PAGADO' && estadoAnterior !== 'PAGADO') {
-        await this.procesarPagoQr(qrPago.id);
+        await this.procesarPagoQr(qrPagoActualizado.id);
         pagoProcesado = true;
       }
 
@@ -211,16 +209,16 @@ class ComprasService {
         success: true,
         message: pagoProcesado
           ? '¡Pago detectado y procesado exitosamente!'
-          : `Estado verificado: ${qrPago.estado}`,
+          : `Estado verificado: ${qrPagoActualizado.estado}`,
         qr: {
-          id: qrPago.id,
-          alias: qrPago.alias,
-          estado: qrPago.estado,
-          monto: qrPago.monto,
-          moneda: qrPago.moneda,
-          fechaVencimiento: qrPago.fechaVencimiento,
-          imagenQr: qrPago.imagenQr || undefined,
-          detalleGlosa: qrPago.detalleGlosa || undefined
+          id: qrPagoActualizado.id,
+          alias: qrPagoActualizado.alias,
+          estado: qrPagoActualizado.estado,
+          monto: qrPagoActualizado.monto,
+          moneda: qrPagoActualizado.moneda,
+          fechaVencimiento: qrPagoActualizado.fechaVencimiento,
+          imagenQr: qrPagoActualizado.imagenQr || undefined,
+          detalleGlosa: qrPagoActualizado.detalleGlosa || ''
         },
         estadoTransaccion: responseBanco.objeto,
         pagoProcesado
@@ -262,13 +260,15 @@ class ComprasService {
         });
 
         // 3. Actualizar compra a PAGADO
-        await tx.compra.update({
-          where: { id: qrPago.compraId },
-          data: {
-            estadoPago: EstadoPago.PAGADO,
-            metodoPago: 'QR BANCO'
-          }
-        });
+        if (qrPago.compraId) {
+          await tx.compra.update({
+            where: { id: qrPago.compraId },
+            data: {
+              estadoPago: EstadoPago.PAGADO,
+              metodoPago: 'QR BANCO'
+            }
+          });
+        }
 
         // 4. Actualizar asiento a VENDIDO
         await tx.asiento.update({
