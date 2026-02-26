@@ -3,7 +3,7 @@ import { Server as SocketIOServer } from 'socket.io';
 import { getAsientosPorEvento, getAsientoById, reservarAsiento, liberarAsiento } from './asientos.service';
 
 interface AuthRequest extends Request {
-  user?: { id: string; email: string; rol: string };
+  user?: { id: string; email: string; isAdmin: boolean; tipoRol?: string };
   io?: SocketIOServer;
 }
 

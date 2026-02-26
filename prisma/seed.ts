@@ -1,4 +1,5 @@
 import { PrismaClient } from '@prisma/client';
+import bcrypt from 'bcryptjs';
 
 const prisma = new PrismaClient();
 
@@ -12,10 +13,30 @@ async function main() {
   await prisma.compra.deleteMany();
   await prisma.asiento.deleteMany();
   await prisma.evento.deleteMany();
+  await prisma.rol.deleteMany();
   await prisma.usuario.deleteMany();
 
   // ============================================
-  // 1. CREAR USUARIOS
+  // 1. CREAR ROL (ADMINISTRADOR PRINCIPAL)
+  // ============================================
+  console.log('🔑 Creando administrador principal...');
+
+  const hashedPassword = await bcrypt.hash('superadmin', 10);
+
+  const superAdmin = await prisma.rol.create({
+    data: {
+      nombre: 'Administrador Principal',
+      email: 'administrador@gmail.com',
+      password: hashedPassword,
+      tipoRol: 'SUPER_ADMIN',
+      estado: 'ACTIVO',
+    },
+  });
+
+  console.log(`✅ Creado 1 administrador principal`);
+
+  // ============================================
+  // 2. CREAR USUARIOS
   // ============================================
   console.log('👥 Creando usuarios...');
 
@@ -26,7 +47,6 @@ async function main() {
       telefono: '+591 70000001',
       agencia: 'Oficina Central',
       googleId: 'google_admin_123',
-      rol: 'ADMIN',
     },
   });
 
@@ -38,7 +58,6 @@ async function main() {
         telefono: '+591 70123456',
         agencia: 'La Paz Centro',
         googleId: 'google_user_001',
-        rol: 'USUARIO',
       },
       {
         email: 'maria.garcia@gmail.com',
@@ -46,7 +65,6 @@ async function main() {
         telefono: '+591 70234567',
         agencia: 'La Paz Sur',
         googleId: 'google_user_002',
-        rol: 'USUARIO',
       },
       {
         email: 'carlos.rodriguez@gmail.com',
@@ -54,7 +72,6 @@ async function main() {
         telefono: '+591 70345678',
         agencia: 'Zona Sopocachi',
         googleId: 'google_user_003',
-        rol: 'USUARIO',
       },
     ],
   });
@@ -113,9 +130,7 @@ async function main() {
   // ============================================
   console.log('🎫 Creando compras de ejemplo...');
 
-  const allUsers = await prisma.usuario.findMany({
-    where: { rol: 'USUARIO' },
-  });
+  const allUsers = await prisma.usuario.findMany();
 
   const asientosParaVender = await prisma.asiento.findMany({
     where: { eventoId: evento.id },
@@ -226,6 +241,7 @@ async function main() {
   console.log('═══════════════════════════════════════');
 
   const stats = {
+    roles: await prisma.rol.count(),
     usuarios: await prisma.usuario.count(),
     eventos: await prisma.evento.count(),
     asientos: await prisma.asiento.count(),
@@ -239,6 +255,7 @@ async function main() {
     reembolsos: await prisma.reembolso.count(),
   };
 
+  console.log(`🔑 Roles (Admins): ${stats.roles}`);
   console.log(`👥 Usuarios: ${stats.usuarios}`);
   console.log(`🎪 Eventos: ${stats.eventos}`);
   console.log(`💺 Asientos totales: ${stats.asientos}`);
@@ -250,12 +267,12 @@ async function main() {
   console.log(`💸 Reembolsos: ${stats.reembolsos}`);
   console.log('═══════════════════════════════════════');
 
-  console.log('\n🔑 CREDENCIALES DE PRUEBA:');
+  console.log('\n🔑 CREDENCIALES DE PRUEBA - ADMINISTRADOR:');
   console.log('═══════════════════════════════════════');
-  console.log('Admin:');
-  console.log(`  Email: ${admin.email}`);
-  console.log(`  Google ID: ${admin.googleId}`);
-  console.log(`  Rol: ${admin.rol}\n`);
+  console.log('Super Admin:');
+  console.log(`  Email: ${superAdmin.email}`);
+  console.log(`  Password: superadmin`);
+  console.log(`  Rol: ${superAdmin.tipoRol}\n`);
 
   console.log('💡 PRÓXIMOS PASOS:');
   console.log('═══════════════════════════════════════');

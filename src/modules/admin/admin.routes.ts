@@ -7,7 +7,10 @@ import {
   getAttendance,
   getAgencies,
   exportData,
+  getUsers,
+  getUserPurchasesHandler,
 } from './admin.controller';
+import rolesRoutes from './roles.routes';
 
 const router = Router();
 
@@ -21,5 +24,12 @@ router.get('/reports/agencias', authenticate, adminOnly, getAgencies);
 
 // Exportación
 router.get('/export', authenticate, adminOnly, exportData);
+
+// Usuarios
+router.get('/users', authenticate, adminOnly, getUsers);
+router.get('/users/:userId/purchases', authenticate, adminOnly, getUserPurchasesHandler);
+
+// Roles (Administradores)
+router.use('/roles', rolesRoutes);
 
 export default router;

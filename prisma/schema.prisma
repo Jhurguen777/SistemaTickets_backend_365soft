@@ -9,12 +9,17 @@ datasource db {
   url      = env("DATABASE_URL")
 }
 
+// ============================================
+// USUARIOS Y AUTENTICACIÓN
+// ============================================
+
 model Usuario {
   id          String       @id @default(uuid())
   email       String       @unique
   nombre      String
   apellido    String?
   password    String?
+  ci          String?      // ← agregado desde main
   telefono    String?
   agencia     String?
   googleId    String?      @unique
@@ -28,6 +33,29 @@ model Usuario {
 
   @@map("usuarios")
 }
+
+// ============================================
+// ROLES DE ADMINISTRACIÓN
+// (modelo de main, renombrado AdminRol para no chocar con el enum Rol)
+// ============================================
+
+model AdminRol {
+  id           String    @id @default(uuid())
+  nombre       String
+  email        String    @unique
+  password     String
+  tipoRol      TipoRol   @default(GESTOR_EVENTOS)
+  estado       EstadoRol @default(ACTIVO)
+  ultimoAcceso DateTime?
+  createdAt    DateTime  @default(now())
+  updatedAt    DateTime  @updatedAt
+
+  @@map("roles")
+}
+
+// ============================================
+// EVENTOS
+// ============================================
 
 model Evento {
   id                        String         @id @default(uuid())
@@ -59,6 +87,10 @@ model Evento {
   @@map("eventos")
 }
 
+// ============================================
+// SECTORES DE EVENTOS
+// ============================================
+
 model SectorEvento {
   id         String   @id @default(uuid())
   eventoId   String
@@ -73,12 +105,16 @@ model SectorEvento {
   @@map("sectores_evento")
 }
 
+// ============================================
+// ASIENTOS
+// ============================================
+
 model Asiento {
   id          String        @id @default(uuid())
   eventoId    String
   fila        String
   numero      Int
-  precio      Float?        // ✅ NUEVO — null = heredar precio del evento/sector
+  precio      Float?        // ✅ precio individual — null = heredar del evento/sector
   estado      EstadoAsiento @default(DISPONIBLE)
   reservadoEn DateTime?
   createdAt   DateTime      @default(now())
@@ -91,6 +127,10 @@ model Asiento {
   @@index([eventoId])
   @@map("asientos")
 }
+
+// ============================================
+// PAGOS QR — se mantiene versión de modulo-de-asistencia (más completa)
+// ============================================
 
 model QrPagos {
   id               String    @id @default(uuid())
@@ -117,28 +157,32 @@ model QrPagos {
   @@map("qr_pagos")
 }
 
+// ============================================
+// COMPRAS — se mantiene versión de modulo-de-asistencia (más completa)
+// ============================================
+
 model Compra {
-  id              String     @id @default(uuid())
+  id              String      @id @default(uuid())
   usuarioId       String
   eventoId        String
-  asientoId       String     @unique
+  asientoId       String      @unique
   monto           Float
-  moneda          String     @default("USD")
+  moneda          String      @default("USD")
   metodoPago      String?
-  estadoPago      EstadoPago @default(PENDIENTE)
-  stripePaymentId String?    @unique
-  qrPagoId        String?    @unique
-  qrPagoAlias     String?    @unique
-  qrCode          String     @unique
-  qrCodeUsado     Boolean    @default(false)
+  estadoPago      EstadoPago  @default(PENDIENTE)
+  stripePaymentId String?     @unique
+  qrPagoId        String?     @unique
+  qrPagoAlias     String?     @unique
+  qrCode          String      @unique
+  qrCodeUsado     Boolean     @default(false)
   certificadoUrl  String?
-  createdAt       DateTime   @default(now())
-  updatedAt       DateTime   @updatedAt
+  createdAt       DateTime    @default(now())
+  updatedAt       DateTime    @updatedAt
 
-  usuario         Usuario    @relation(fields: [usuarioId], references: [id], onDelete: Cascade)
-  evento          Evento     @relation(fields: [eventoId], references: [id], onDelete: Cascade)
-  asiento         Asiento    @relation(fields: [asientoId], references: [id], onDelete: Cascade)
-  qrPago          QrPagos?   @relation(fields: [qrPagoId], references: [id])
+  usuario         Usuario     @relation(fields: [usuarioId], references: [id], onDelete: Cascade)
+  evento          Evento      @relation(fields: [eventoId], references: [id], onDelete: Cascade)
+  asiento         Asiento     @relation(fields: [asientoId], references: [id], onDelete: Cascade)
+  qrPago          QrPagos?    @relation(fields: [qrPagoId], references: [id])
   asistencia      Asistencia?
 
   @@index([usuarioId])
@@ -146,6 +190,10 @@ model Compra {
   @@index([estadoPago])
   @@map("compras")
 }
+
+// ============================================
+// ASISTENCIA
+// ============================================
 
 model Asistencia {
   id            String   @id @default(uuid())
@@ -161,6 +209,10 @@ model Asistencia {
 
   @@map("asistencias")
 }
+
+// ============================================
+// REEMBOLSOS
+// ============================================
 
 model Reembolso {
   id             String          @id @default(uuid())
@@ -178,9 +230,26 @@ model Reembolso {
   @@map("reembolsos")
 }
 
+// ============================================
+// ENUMS
+// ============================================
+
 enum Rol {
   USUARIO
   ADMIN
+}
+
+enum TipoRol {
+  SUPER_ADMIN
+  GESTOR_EVENTOS
+  GESTOR_REPORTES
+  GESTOR_ASISTENCIA
+  GESTOR_USUARIOS
+}
+
+enum EstadoRol {
+  ACTIVO
+  INACTIVO
 }
 
 enum EstadoEvento {

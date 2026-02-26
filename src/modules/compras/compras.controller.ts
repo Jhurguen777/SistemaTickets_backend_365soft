@@ -302,7 +302,7 @@ class ComprasController {
       const prisma = (await import('@prisma/client')).PrismaClient;
       const prismaClient = new prisma();
 
-      const qrPago = await prismaClient.qrPagos.findUnique({
+      const qrPago = await prismaClient.qrPago.findUnique({
         where: { id: qrId },
         include: {
           compra: {
@@ -364,7 +364,7 @@ class ComprasController {
   async limpiarQrsVencidos(req: Request, res: Response): Promise<void> {
     try {
       // Verificar que sea admin o un cron job interno
-      const isAdmin = req.user?.rol === 'ADMIN';
+      const isAdmin = req.user?.isAdmin === true;
       const isInternal = req.headers['x-internal-cron'] === 'true';
 
       if (!isAdmin && !isInternal) {

@@ -141,7 +141,7 @@ export class AsistenciaService {
       { header: "Fecha de Ingreso", key: "ingresoEn", width: 25 },
     ];
 
-    sheet.getRow(1).eachCell((cell) => {
+    sheet.getRow(1).eachCell((cell: any) => {
       cell.font = { bold: true, color: { argb: "FFFFFFFF" } };
       cell.fill = {
         type: "pattern",
