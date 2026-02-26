@@ -1,3 +1,5 @@
+// prisma/schema.prisma
+
 generator client {
   provider = "prisma-client-js"
 }
@@ -7,23 +9,53 @@ datasource db {
   url      = env("DATABASE_URL")
 }
 
+// ============================================
+// USUARIOS Y AUTENTICACIÓN
+// ============================================
+
 model Usuario {
   id          String       @id @default(uuid())
   email       String       @unique
   nombre      String
   apellido    String?
   password    String?
-  ci          String?
+  ci          String?      // ← agregado desde main
   telefono    String?
   agencia     String?
   googleId    String?      @unique
+  rol         Rol          @default(USUARIO)
+  activo      Boolean      @default(true)
   createdAt   DateTime     @default(now())
   updatedAt   DateTime     @updatedAt
-  asistencias Asistencia[]
+
   compras     Compra[]
+  asistencias Asistencia[]
 
   @@map("usuarios")
 }
+
+// ============================================
+// ROLES DE ADMINISTRACIÓN
+// (modelo de main, renombrado AdminRol para no chocar con el enum Rol)
+// ============================================
+
+model AdminRol {
+  id           String    @id @default(uuid())
+  nombre       String
+  email        String    @unique
+  password     String
+  tipoRol      TipoRol   @default(GESTOR_EVENTOS)
+  estado       EstadoRol @default(ACTIVO)
+  ultimoAcceso DateTime?
+  createdAt    DateTime  @default(now())
+  updatedAt    DateTime  @updatedAt
+
+  @@map("roles")
+}
+
+// ============================================
+// EVENTOS
+// ============================================
 
 model Evento {
   id                        String         @id @default(uuid())
@@ -32,27 +64,32 @@ model Evento {
   fecha                     DateTime
   hora                      String
   ubicacion                 String
+  direccion                 String?
   imagenUrl                 String?
   capacidad                 Int
   precio                    Float
+  categoria                 String         @default("Fiestas")
+  subcategoria              String?
+  organizer                 String?
+  doorsOpen                 String?
   estado                    EstadoEvento   @default(ACTIVO)
   activo                    Boolean        @default(true)
-  createdAt                 DateTime       @default(now())
-  updatedAt                 DateTime       @updatedAt
-  categoria                 String         @default("Fiestas")
-  direccion                 String?
-  doorsOpen                 String?
-  organizer                 String?
-  subcategoria              String?
   seatMapConfig             Json?
   permitirMultiplesAsientos Boolean        @default(false)
   limiteAsientosPorUsuario  Int            @default(1)
+  createdAt                 DateTime       @default(now())
+  updatedAt                 DateTime       @updatedAt
+
   asientos                  Asiento[]
   compras                   Compra[]
   sectores                  SectorEvento[]
 
   @@map("eventos")
 }
+
+// ============================================
+// SECTORES DE EVENTOS
+// ============================================
 
 model SectorEvento {
   id         String   @id @default(uuid())
@@ -62,20 +99,27 @@ model SectorEvento {
   disponible Int
   total      Int
   createdAt  DateTime @default(now())
+
   evento     Evento   @relation(fields: [eventoId], references: [id], onDelete: Cascade)
 
   @@map("sectores_evento")
 }
+
+// ============================================
+// ASIENTOS
+// ============================================
 
 model Asiento {
   id          String        @id @default(uuid())
   eventoId    String
   fila        String
   numero      Int
+  precio      Float?        // ✅ precio individual — null = heredar del evento/sector
   estado      EstadoAsiento @default(DISPONIBLE)
   reservadoEn DateTime?
   createdAt   DateTime      @default(now())
   updatedAt   DateTime      @updatedAt
+
   evento      Evento        @relation(fields: [eventoId], references: [id], onDelete: Cascade)
   compra      Compra?
 
@@ -83,6 +127,39 @@ model Asiento {
   @@index([eventoId])
   @@map("asientos")
 }
+
+// ============================================
+// PAGOS QR — se mantiene versión de modulo-de-asistencia (más completa)
+// ============================================
+
+model QrPagos {
+  id               String    @id @default(uuid())
+  alias            String    @unique
+  estado           EstadoQr  @default(PENDIENTE)
+  monto            Float
+  moneda           String    @default("BOB")
+  compraId         String?   @unique
+  fechaVencimiento DateTime
+  imagenQr         String?
+  detalleGlosa     String?
+  numeroOrden      String?
+  nombreCliente    String?
+  documentoCliente String?
+  cuentaCliente    String?
+  fechaproceso     DateTime?
+  createdAt        DateTime  @default(now())
+  updatedAt        DateTime  @updatedAt
+
+  compra           Compra?
+
+  @@index([estado])
+  @@index([compraId])
+  @@map("qr_pagos")
+}
+
+// ============================================
+// COMPRAS — se mantiene versión de modulo-de-asistencia (más completa)
+// ============================================
 
 model Compra {
   id              String      @id @default(uuid())
@@ -94,23 +171,29 @@ model Compra {
   metodoPago      String?
   estadoPago      EstadoPago  @default(PENDIENTE)
   stripePaymentId String?     @unique
+  qrPagoId        String?     @unique
+  qrPagoAlias     String?     @unique
   qrCode          String      @unique
   qrCodeUsado     Boolean     @default(false)
   certificadoUrl  String?
-  qrPagoId        String?     @unique
-  qrPagoAlias     String?
   createdAt       DateTime    @default(now())
   updatedAt       DateTime    @updatedAt
-  asistencia      Asistencia?
-  asiento         Asiento     @relation(fields: [asientoId], references: [id], onDelete: Cascade)
-  evento          Evento      @relation(fields: [eventoId], references: [id], onDelete: Cascade)
+
   usuario         Usuario     @relation(fields: [usuarioId], references: [id], onDelete: Cascade)
-  qrPago          QrPago?
+  evento          Evento      @relation(fields: [eventoId], references: [id], onDelete: Cascade)
+  asiento         Asiento     @relation(fields: [asientoId], references: [id], onDelete: Cascade)
+  qrPago          QrPagos?    @relation(fields: [qrPagoId], references: [id])
+  asistencia      Asistencia?
 
   @@index([usuarioId])
   @@index([eventoId])
+  @@index([estadoPago])
   @@map("compras")
 }
+
+// ============================================
+// ASISTENCIA
+// ============================================
 
 model Asistencia {
   id            String   @id @default(uuid())
@@ -120,11 +203,16 @@ model Asistencia {
   validadoPor   String?
   ubicacionGPS  String?
   dispositivoId String?
+
   compra        Compra   @relation(fields: [compraId], references: [id], onDelete: Cascade)
   usuario       Usuario  @relation(fields: [usuarioId], references: [id], onDelete: Cascade)
 
   @@map("asistencias")
 }
+
+// ============================================
+// REEMBOLSOS
+// ============================================
 
 model Reembolso {
   id             String          @id @default(uuid())
@@ -142,40 +230,13 @@ model Reembolso {
   @@map("reembolsos")
 }
 
-model QrPago {
-  id                String      @id @default(uuid())
-  compraId          String      @unique
-  alias             String      @unique
-  estado            EstadoQr    @default(PENDIENTE)
-  monto             Float
-  moneda            String      @default("BOB")
-  fechaVencimiento  DateTime?
-  imagenQr          String?     @db.Text
-  detalleGlosa      String?
-  numeroOrden       String?
-  nombreCliente     String?
-  documentoCliente  String?
-  cuentaCliente     String?
-  fechaproceso      DateTime?
-  createdAt         DateTime    @default(now())
-  updatedAt         DateTime    @updatedAt
-  compra            Compra      @relation(fields: [compraId], references: [id], onDelete: Cascade)
+// ============================================
+// ENUMS
+// ============================================
 
-  @@map("qr_pagos")
-}
-
-model Rol {
-  id           String         @id @default(uuid())
-  nombre       String
-  email        String         @unique
-  password     String
-  tipoRol      TipoRol        @default(GESTOR_EVENTOS)
-  estado       EstadoRol      @default(ACTIVO)
-  ultimoAcceso DateTime?
-  createdAt    DateTime       @default(now())
-  updatedAt    DateTime       @updatedAt
-
-  @@map("roles")
+enum Rol {
+  USUARIO
+  ADMIN
 }
 
 enum TipoRol {
@@ -212,17 +273,17 @@ enum EstadoPago {
   FALLIDO
 }
 
+enum EstadoQr {
+  PENDIENTE
+  PAGADO
+  CANCELADO
+  VENCIDO
+}
+
 enum EstadoReembolso {
   SOLICITADO
   EN_REVISION
   APROBADO
   RECHAZADO
   PROCESADO
-}
-
-enum EstadoQr {
-  PENDIENTE
-  PAGADO
-  VENCIDO
-  CANCELADO
 }
