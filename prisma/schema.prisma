@@ -9,112 +9,81 @@ datasource db {
   url      = env("DATABASE_URL")
 }
 
-// ============================================
-// USUARIOS Y AUTENTICACIÓN
-// ============================================
-
 model Usuario {
-  id            String    @id @default(uuid())
-  email         String    @unique
-  nombre        String
-  apellido      String?
-  password      String?
-  telefono      String?
-  agencia       String?
-  googleId      String?   @unique
-  rol           Rol       @default(USUARIO)
-  activo        Boolean   @default(true)
-  createdAt     DateTime  @default(now())
-  updatedAt     DateTime  @updatedAt
+  id          String       @id @default(uuid())
+  email       String       @unique
+  nombre      String
+  apellido    String?
+  password    String?
+  telefono    String?
+  agencia     String?
+  googleId    String?      @unique
+  rol         Rol          @default(USUARIO)
+  activo      Boolean      @default(true)
+  createdAt   DateTime     @default(now())
+  updatedAt   DateTime     @updatedAt
 
-  // Relaciones
-  compras       Compra[]
-  asistencias   Asistencia[]
+  compras     Compra[]
+  asistencias Asistencia[]
 
   @@map("usuarios")
 }
 
-enum Rol {
-  USUARIO
-  ADMIN
-}
-
-// ============================================
-// EVENTOS
-// ============================================
-
 model Evento {
-  id                             String                @id @default(uuid())
-  titulo                         String
-  descripcion                    String?
-  fecha                          DateTime
-  hora                           String
-  ubicacion                      String
-  direccion                      String?
-  imagenUrl                      String?
-  capacidad                      Int
-  precio                         Float
-  categoria                      String                @default("Fiestas")
-  subcategoria                   String?
-  organizer                      String?
-  doorsOpen                      String?
-  estado                         EstadoEvento         @default(ACTIVO)
-  activo                         Boolean               @default(true)
-  seatMapConfig                  Json?
-  permitirMultiplesAsientos      Boolean               @default(false)
-  limiteAsientosPorUsuario       Int                   @default(1)
-  createdAt                      DateTime              @default(now())
-  updatedAt                      DateTime              @updatedAt
+  id                        String         @id @default(uuid())
+  titulo                    String
+  descripcion               String?
+  fecha                     DateTime
+  hora                      String
+  ubicacion                 String
+  direccion                 String?
+  imagenUrl                 String?
+  capacidad                 Int
+  precio                    Float
+  categoria                 String         @default("Fiestas")
+  subcategoria              String?
+  organizer                 String?
+  doorsOpen                 String?
+  estado                    EstadoEvento   @default(ACTIVO)
+  activo                    Boolean        @default(true)
+  seatMapConfig             Json?
+  permitirMultiplesAsientos Boolean        @default(false)
+  limiteAsientosPorUsuario  Int            @default(1)
+  createdAt                 DateTime       @default(now())
+  updatedAt                 DateTime       @updatedAt
 
-  // Relaciones
-  asientos                       Asiento[]
-  compras                        Compra[]
-  sectores                       SectorEvento[]
+  asientos                  Asiento[]
+  compras                   Compra[]
+  sectores                  SectorEvento[]
 
   @@map("eventos")
 }
 
-enum EstadoEvento {
-  ACTIVO
-  PAUSADO
-  FINALIZADO
-  CANCELADO
-}
-
-// ============================================
-// SECTORES DE EVENTOS
-// ============================================
-
 model SectorEvento {
-  id          String   @id @default(uuid())
-  eventoId    String
-  nombre      String   // General, VIP, Super VIP
-  precio      Float
-  disponible  Int
-  total       Int
-  createdAt   DateTime @default(now())
+  id         String   @id @default(uuid())
+  eventoId   String
+  nombre     String
+  precio     Float
+  disponible Int
+  total      Int
+  createdAt  DateTime @default(now())
 
-  // Relaciones
-  evento      Evento   @relation(fields: [eventoId], references: [id], onDelete: Cascade)
+  evento     Evento   @relation(fields: [eventoId], references: [id], onDelete: Cascade)
 
   @@map("sectores_evento")
 }
-
-// ============================================
-// ASIENTOS
-// ============================================
 
 model Asiento {
   id          String        @id @default(uuid())
   eventoId    String
   fila        String
   numero      Int
+  precio      Float?        // ✅ NUEVO — null = heredar precio del evento/sector
   estado      EstadoAsiento @default(DISPONIBLE)
   reservadoEn DateTime?
   createdAt   DateTime      @default(now())
   updatedAt   DateTime      @updatedAt
 
-  // Relaciones
   evento      Evento        @relation(fields: [eventoId], references: [id], onDelete: Cascade)
   compra      Compra?
 
@@ -123,95 +92,60 @@ model Asiento {
   @@map("asientos")
 }
 
-enum EstadoAsiento {
-  DISPONIBLE
-  RESERVANDO
-  VENDIDO
-  BLOQUEADO
-}
-
-// ============================================
-// PAGOS QR (Banco MC4)
-// ============================================
-
 model QrPagos {
-  id                String        @id @default(uuid())
-  alias             String        @unique
-  estado            EstadoQr      @default(PENDIENTE)
-  monto             Float
-  moneda            String        @default("BOB")
-  compraId          String?       @unique
-  fechaVencimiento  DateTime
-  imagenQr          String?
-  detalleGlosa      String?
-  numeroOrden       String?
-  nombreCliente     String?
-  documentoCliente  String?
-  cuentaCliente     String?
-  fechaproceso      DateTime?
-  createdAt         DateTime      @default(now())
-  updatedAt         DateTime      @updatedAt
+  id               String    @id @default(uuid())
+  alias            String    @unique
+  estado           EstadoQr  @default(PENDIENTE)
+  monto            Float
+  moneda           String    @default("BOB")
+  compraId         String?   @unique
+  fechaVencimiento DateTime
+  imagenQr         String?
+  detalleGlosa     String?
+  numeroOrden      String?
+  nombreCliente    String?
+  documentoCliente String?
+  cuentaCliente    String?
+  fechaproceso     DateTime?
+  createdAt        DateTime  @default(now())
+  updatedAt        DateTime  @updatedAt
 
-  // Relaciones
-  compra            Compra?
+  compra           Compra?
 
   @@index([estado])
   @@index([compraId])
   @@map("qr_pagos")
 }
 
-enum EstadoQr {
-  PENDIENTE
-  PAGADO
-  CANCELADO
-  VENCIDO
-}
-
-// ============================================
-// COMPRAS
-// ============================================
-
 model Compra {
-  id                String        @id @default(uuid())
-  usuarioId         String
-  eventoId          String
-  asientoId         String        @unique
-  monto             Float
-  moneda            String        @default("USD")
-  metodoPago        String?
-  estadoPago        EstadoPago    @default(PENDIENTE)
-  stripePaymentId   String?       @unique
-  qrPagoId          String?       @unique
-  qrPagoAlias       String?       @unique
-  qrCode            String        @unique
-  qrCodeUsado       Boolean       @default(false)
-  certificadoUrl    String?
-  createdAt         DateTime      @default(now())
-  updatedAt         DateTime      @updatedAt
+  id              String     @id @default(uuid())
+  usuarioId       String
+  eventoId        String
+  asientoId       String     @unique
+  monto           Float
+  moneda          String     @default("USD")
+  metodoPago      String?
+  estadoPago      EstadoPago @default(PENDIENTE)
+  stripePaymentId String?    @unique
+  qrPagoId        String?    @unique
+  qrPagoAlias     String?    @unique
+  qrCode          String     @unique
+  qrCodeUsado     Boolean    @default(false)
+  certificadoUrl  String?
+  createdAt       DateTime   @default(now())
+  updatedAt       DateTime   @updatedAt
 
-  // Relaciones
-  usuario           Usuario       @relation(fields: [usuarioId], references: [id], onDelete: Cascade)
-  evento            Evento        @relation(fields: [eventoId], references: [id], onDelete: Cascade)
-  asiento           Asiento       @relation(fields: [asientoId], references: [id], onDelete: Cascade)
-  qrPago            QrPagos?      @relation(fields: [qrPagoId], references: [id])
-  asistencia        Asistencia?
+  usuario         Usuario    @relation(fields: [usuarioId], references: [id], onDelete: Cascade)
+  evento          Evento     @relation(fields: [eventoId], references: [id], onDelete: Cascade)
+  asiento         Asiento    @relation(fields: [asientoId], references: [id], onDelete: Cascade)
+  qrPago          QrPagos?   @relation(fields: [qrPagoId], references: [id])
+  asistencia      Asistencia?
 
   @@index([usuarioId])
   @@index([eventoId])
   @@index([estadoPago])
   @@map("compras")
 }
-
-enum EstadoPago {
-  PENDIENTE
-  PAGADO
-  REEMBOLSADO
-  FALLIDO
-}
-
-// ============================================
-// ASISTENCIA
-// ============================================
 
 model Asistencia {
   id            String   @id @default(uuid())
@@ -222,31 +156,59 @@ model Asistencia {
   ubicacionGPS  String?
   dispositivoId String?
 
-  // Relaciones
   compra        Compra   @relation(fields: [compraId], references: [id], onDelete: Cascade)
   usuario       Usuario  @relation(fields: [usuarioId], references: [id], onDelete: Cascade)
 
   @@map("asistencias")
 }
 
-// ============================================
-// REEMBOLSOS
-// ============================================
-
 model Reembolso {
-  id             String         @id @default(uuid())
-  compraId       String         @unique
+  id             String          @id @default(uuid())
+  compraId       String          @unique
   monto          Float
   razon          String
   estado         EstadoReembolso @default(SOLICITADO)
-  stripeRefundId String?        @unique
-  aprobado       Boolean        @default(false)
-  solicitadoEn   DateTime       @default(now())
+  stripeRefundId String?         @unique
+  aprobado       Boolean         @default(false)
+  solicitadoEn   DateTime        @default(now())
   resolvedoEn    DateTime?
-  createdAt      DateTime       @default(now())
-  updatedAt      DateTime       @updatedAt
+  createdAt      DateTime        @default(now())
+  updatedAt      DateTime        @updatedAt
 
   @@map("reembolsos")
+}
+
+enum Rol {
+  USUARIO
+  ADMIN
+}
+
+enum EstadoEvento {
+  ACTIVO
+  PAUSADO
+  FINALIZADO
+  CANCELADO
+}
+
+enum EstadoAsiento {
+  DISPONIBLE
+  RESERVANDO
+  VENDIDO
+  BLOQUEADO
+}
+
+enum EstadoPago {
+  PENDIENTE
+  PAGADO
+  REEMBOLSADO
+  FALLIDO
+}
+
+enum EstadoQr {
+  PENDIENTE
+  PAGADO
+  CANCELADO
+  VENCIDO
 }
 
 enum EstadoReembolso {

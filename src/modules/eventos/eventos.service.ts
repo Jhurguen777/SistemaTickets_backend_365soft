@@ -67,36 +67,23 @@ export interface UpdateEventoData {
 export const getEventos = async (filters: GetEventosFilters) => {
   const where: any = {};
 
-  // Filtro por estado
-  if (filters.estado) {
-    where.estado = filters.estado;
-  }
-
-  // Filtro por fecha (eventos desde una fecha en adelante)
-  if (filters.fecha) {
-    where.fecha = { gte: filters.fecha };
-  }
-
-  // Filtro por ubicación
+  if (filters.estado) where.estado = filters.estado;
+  if (filters.fecha)  where.fecha  = { gte: filters.fecha };
   if (filters.ubicacion) {
     where.ubicacion = { contains: filters.ubicacion, mode: 'insensitive' };
   }
-
-  // Búsqueda (título o descripción)
   if (filters.search) {
     where.OR = [
-      { titulo: { contains: filters.search, mode: 'insensitive' } },
+      { titulo:      { contains: filters.search, mode: 'insensitive' } },
       { descripcion: { contains: filters.search, mode: 'insensitive' } },
-      { ubicacion: { contains: filters.search, mode: 'insensitive' } },
-      { categoria: { contains: filters.search, mode: 'insensitive' } }
+      { ubicacion:   { contains: filters.search, mode: 'insensitive' } },
+      { categoria:   { contains: filters.search, mode: 'insensitive' } }
     ];
   }
 
-  // Paginación
   const skip = ((filters.page || 1) - 1) * (filters.limit || 10);
   const take = filters.limit || 10;
 
-  // Obtener eventos
   const [eventos, total] = await Promise.all([
     prisma.evento.findMany({
       where,
@@ -122,20 +109,9 @@ export const getEventos = async (filters: GetEventosFilters) => {
         activo: true,
         seatMapConfig: true,
         createdAt: true,
-        _count: {
-          select: {
-            asientos: true,
-            compras: true
-          }
-        },
+        _count: { select: { asientos: true, compras: true } },
         sectores: {
-          select: {
-            id: true,
-            nombre: true,
-            precio: true,
-            disponible: true,
-            total: true
-          }
+          select: { id: true, nombre: true, precio: true, disponible: true, total: true }
         }
       }
     }),
@@ -155,7 +131,7 @@ export const getEventos = async (filters: GetEventosFilters) => {
 
 // ── OBTENER EVENTO POR ID ────────────────────────────────────────────
 export const getEventoById = async (id: string) => {
-  const evento = await prisma.evento.findUnique({
+  return prisma.evento.findUnique({
     where: { id },
     select: {
       id: true,
@@ -177,28 +153,26 @@ export const getEventoById = async (id: string) => {
       seatMapConfig: true,
       createdAt: true,
       updatedAt: true,
-      _count: {
-        select: {
-          asientos: true,
-          compras: true
-        }
-      },
-      sectores: {
-        orderBy: { precio: 'asc' }
-      },
+      _count: { select: { asientos: true, compras: true } },
+      sectores: { orderBy: { precio: 'asc' } },
       asientos: {
         take: 10,
-        orderBy: [{ fila: 'asc' }, { numero: 'asc' }]
+        orderBy: [{ fila: 'asc' }, { numero: 'asc' }],
+        select: {
+          id: true,
+          fila: true,
+          numero: true,
+          precio: true,   // ✅ precio individual
+          estado: true
+        }
       }
     }
   });
-
-  return evento;
 };
 
 // ── CREAR EVENTO ───────────────────────────────────────────────────────
 export const createEvento = async (data: CreateEventoData) => {
-  const evento = await prisma.evento.create({
+  return prisma.evento.create({
     data: {
       titulo: data.titulo,
       descripcion: data.descripcion,
@@ -218,203 +192,161 @@ export const createEvento = async (data: CreateEventoData) => {
       limiteAsientosPorUsuario: data.limiteAsientosPorUsuario || 1,
       seatMapConfig: data.seatMapConfig || null,
       sectores: data.sectores ? {
-        create: data.sectores.map(sector => ({
-          nombre: sector.nombre,
-          precio: sector.precio,
-          disponible: sector.total,
-          total: sector.total
+        create: data.sectores.map(s => ({
+          nombre: s.nombre,
+          precio: s.precio,
+          disponible: s.total,
+          total: s.total
         }))
       } : undefined
     },
     select: {
-      id: true,
-      titulo: true,
-      descripcion: true,
-      fecha: true,
-      hora: true,
-      ubicacion: true,
-      direccion: true,
-      imagenUrl: true,
-      capacidad: true,
-      precio: true,
-      categoria: true,
-      subcategoria: true,
-      organizer: true,
-      doorsOpen: true,
-      estado: true,
-      seatMapConfig: true,
+      id: true, titulo: true, descripcion: true, fecha: true,
+      hora: true, ubicacion: true, direccion: true, imagenUrl: true,
+      capacidad: true, precio: true, categoria: true, subcategoria: true,
+      organizer: true, doorsOpen: true, estado: true, seatMapConfig: true,
       createdAt: true,
       sectores: {
-        select: {
-          id: true,
-          nombre: true,
-          precio: true,
-          disponible: true,
-          total: true
-        }
+        select: { id: true, nombre: true, precio: true, disponible: true, total: true }
       }
     }
   });
+};
 
-  return evento;
+// ── HELPER: precio efectivo de un asiento ────────────────────────────
+// Jerarquía: specialSeat.price > precio del sector > precio del evento
+const resolverPrecio = (
+  specialSeatPrice: number | undefined,
+  sectorPrecio: number | undefined,
+  eventoPrecio: number
+): number => {
+  if (specialSeatPrice != null && specialSeatPrice > 0) return specialSeatPrice;
+  if (sectorPrecio     != null && sectorPrecio     > 0) return sectorPrecio;
+  return eventoPrecio;
 };
 
 // ── ACTUALIZAR EVENTO ─────────────────────────────────────────────────
 export const updateEvento = async (id: string, data: UpdateEventoData) => {
-  // Verificar que el evento existe
-  const existe = await prisma.evento.findUnique({
-    where: { id }
-  });
+  const existe = await prisma.evento.findUnique({ where: { id } });
+  if (!existe) return null;
 
-  if (!existe) {
-    return null;
+  // Limpiar sectores y asientos anteriores si vienen sectores nuevos
+  if (data.sectores !== undefined) {
+    await prisma.sectorEvento.deleteMany({ where: { eventoId: id } });
+    await prisma.asiento.deleteMany({ where: { eventoId: id } });
   }
 
-  // Si se proporcionan sectores, eliminar los anteriores y crear los nuevos
-  if (data.sectores) {
-    // Eliminar sectores existentes y también los asientos
-    await prisma.sectorEvento.deleteMany({
-      where: { eventoId: id }
-    });
-
-    // Eliminar todos los asientos del evento
-    await prisma.asiento.deleteMany({
-      where: { eventoId: id }
-    });
-  }
-
-  // Actualizar evento
+  // Actualizar evento + re-crear sectores
   const evento = await prisma.evento.update({
     where: { id },
     data: {
-      ...(data.titulo && { titulo: data.titulo }),
-      ...(data.descripcion !== undefined && { descripcion: data.descripcion }),
-      ...(data.fecha && { fecha: new Date(data.fecha) }),
-      ...(data.hora && { hora: data.hora }),
-      ...(data.ubicacion && { ubicacion: data.ubicacion }),
-      ...(data.direccion !== undefined && { direccion: data.direccion }),
-      ...(data.imagenUrl !== undefined && { imagenUrl: data.imagenUrl }),
-      ...(data.capacidad && { capacidad: data.capacidad }),
-      ...(data.precio && { precio: data.precio }),
-      ...(data.categoria && { categoria: data.categoria }),
-      ...(data.subcategoria !== undefined && { subcategoria: data.subcategoria }),
-      ...(data.organizer !== undefined && { organizer: data.organizer }),
-      ...(data.doorsOpen !== undefined && { doorsOpen: data.doorsOpen }),
-      ...(data.estado && { estado: data.estado as any }),
-      ...(data.activo !== undefined && { activo: data.activo }),
+      ...(data.titulo                       && { titulo: data.titulo }),
+      ...(data.descripcion    !== undefined && { descripcion: data.descripcion }),
+      ...(data.fecha                        && { fecha: new Date(data.fecha) }),
+      ...(data.hora                         && { hora: data.hora }),
+      ...(data.ubicacion                    && { ubicacion: data.ubicacion }),
+      ...(data.direccion      !== undefined && { direccion: data.direccion }),
+      ...(data.imagenUrl      !== undefined && { imagenUrl: data.imagenUrl }),
+      ...(data.capacidad                    && { capacidad: data.capacidad }),
+      ...(data.precio                       && { precio: data.precio }),
+      ...(data.categoria                    && { categoria: data.categoria }),
+      ...(data.subcategoria   !== undefined && { subcategoria: data.subcategoria }),
+      ...(data.organizer      !== undefined && { organizer: data.organizer }),
+      ...(data.doorsOpen      !== undefined && { doorsOpen: data.doorsOpen }),
+      ...(data.estado                       && { estado: data.estado as any }),
+      ...(data.activo         !== undefined && { activo: data.activo }),
       ...(data.permitirMultiplesAsientos !== undefined && { permitirMultiplesAsientos: data.permitirMultiplesAsientos }),
-      ...(data.limiteAsientosPorUsuario !== undefined && { limiteAsientosPorUsuario: data.limiteAsientosPorUsuario }),
-      ...(data.seatMapConfig !== undefined && { seatMapConfig: data.seatMapConfig }),
+      ...(data.limiteAsientosPorUsuario  !== undefined && { limiteAsientosPorUsuario: data.limiteAsientosPorUsuario }),
+      ...(data.seatMapConfig  !== undefined && { seatMapConfig: data.seatMapConfig }),
       ...(data.sectores && {
         sectores: {
-          create: data.sectores.map(sector => ({
-            nombre: sector.nombre,
-            precio: sector.precio,
-            total: sector.total,
-            disponible: sector.disponible
+          create: data.sectores.map(s => ({
+            nombre: s.nombre,
+            precio: s.precio,
+            total: s.total,
+            disponible: s.disponible
           }))
         }
       })
     },
     select: {
-      id: true,
-      titulo: true,
-      descripcion: true,
-      fecha: true,
-      hora: true,
-      ubicacion: true,
-      direccion: true,
-      imagenUrl: true,
-      capacidad: true,
-      precio: true,
-      categoria: true,
-      subcategoria: true,
-      organizer: true,
-      doorsOpen: true,
-      estado: true,
-      activo: true,
-      seatMapConfig: true,
-      updatedAt: true,
+      id: true, titulo: true, descripcion: true, fecha: true,
+      hora: true, ubicacion: true, direccion: true, imagenUrl: true,
+      capacidad: true, precio: true, categoria: true, subcategoria: true,
+      organizer: true, doorsOpen: true, estado: true, activo: true,
+      seatMapConfig: true, updatedAt: true,
       sectores: {
-        select: {
-          id: true,
-          nombre: true,
-          precio: true,
-          disponible: true,
-          total: true
-        }
+        select: { id: true, nombre: true, precio: true, disponible: true, total: true }
       }
     }
   });
 
-  // Si se proporcionó seatMapConfig, crear los asientos individuales
-  if (data.seatMapConfig && data.sectores) {
+  // ── CREAR ASIENTOS DESDE EL SEAT MAP CON PRECIO INDIVIDUAL ───────
+  if (data.seatMapConfig) {
     const config = data.seatMapConfig as any;
-    const sectoresCreados = evento.sectores;
+    const rows: any[] = config.rows || [];
 
-    // Mapear sectores por su nombre para obtener el ID
-    const sectoresMap = new Map();
-    sectoresCreados.forEach(sector => {
-      const configSector = config.sectors.find((s: any) => s.name === sector.nombre);
-      if (configSector) {
-        sectoresMap.set(configSector.id, sector.id);
+    if (rows.length > 0) {
+      // Limpiar asientos existentes antes de re-crear
+      await prisma.asiento.deleteMany({ where: { eventoId: id } });
+
+      // Mapa: sectorId-del-config → precio del sector recién creado en BD
+      const sectorPrecioMap = new Map<string, number>();
+      for (const configSector of config.sectors || []) {
+        const sectorBD = evento.sectores.find(s => s.nombre === configSector.name);
+        if (sectorBD) {
+          sectorPrecioMap.set(configSector.id, sectorBD.precio);
+        }
       }
-    });
 
-    // Crear asientos para cada fila
-    const asientosACrear: Array<{
-      fila: string;
-      numero: number;
-      precio: number;
-      estado: 'DISPONIBLE' | 'RESERVANDO' | 'VENDIDO' | 'BLOQUEADO';
-      sectorId: string;
-      eventoId: string;
-    }> = [];
+      const asientosACrear: Array<{
+        fila:     string;
+        numero:   number;
+        precio:   number;
+        estado:   'DISPONIBLE' | 'RESERVANDO' | 'VENDIDO' | 'BLOQUEADO';
+        eventoId: string;
+      }> = [];
 
-    // Procesar filas
-    for (const row of config.rows || []) {
-      const sectorIdConfig = row.sectorId;
-      const sectorIdReal = sectoresMap.get(sectorIdConfig);
+      for (const row of rows) {
+        const totalSeats: number = typeof row.seats === 'number' ? row.seats : 0;
+        // Precio base de la fila = precio del sector al que pertenece
+        const sectorPrecioFila = sectorPrecioMap.get(row.sectorId);
 
-      if (!sectorIdReal) continue;
+        for (let i = 0; i < totalSeats; i++) {
+          const specialSeat = config.specialSeats?.find(
+            (s: any) => s.rowId === row.id && s.seatIndex === i
+          );
 
-      // Crear asientos para esta fila
-      for (let i = 0; i < row.seats; i++) {
-        // El número es un entero secuencial (1, 2, 3...)
-        const numeroAsiento = i + 1;
+          // Estado del asiento
+          let estado: 'DISPONIBLE' | 'RESERVANDO' | 'VENDIDO' | 'BLOQUEADO' = 'DISPONIBLE';
+          if (specialSeat?.status === 'sold')          estado = 'VENDIDO';
+          else if (specialSeat?.status === 'reserved') estado = 'RESERVANDO';
+          else if (specialSeat?.status === 'blocked')  estado = 'BLOQUEADO';
 
-        // Verificar si hay un asiento especial para este asiento
-        const specialSeat = config.specialSeats?.find((s: any) =>
-          s.rowId === row.id && s.seatIndex === i
-        );
+          // ✅ Precio individual: specialSeat.price > sector > evento
+          const precio = resolverPrecio(
+            specialSeat?.price,
+            sectorPrecioFila,
+            existe.precio
+          );
 
-        // Obtener precio del asiento especial o del sector
-        const precio = specialSeat?.price || sectoresCreados.find(s => s.id === sectorIdReal)?.precio || evento.precio;
+          asientosACrear.push({
+            fila:     row.name,
+            numero:   i + 1,
+            precio,
+            estado,
+            eventoId: id
+          });
+        }
+      }
 
-        // Obtener estado del asiento especial o por defecto DISPONIBLE
-        let estado: 'DISPONIBLE' | 'RESERVANDO' | 'VENDIDO' | 'BLOQUEADO' = 'DISPONIBLE';
-        if (specialSeat?.status === 'sold') estado = 'VENDIDO';
-        else if (specialSeat?.status === 'reserved') estado = 'RESERVANDO';
-
-        asientosACrear.push({
-          fila: row.name,
-          numero: numeroAsiento,
-          precio,
-          estado,
-          sectorId: sectorIdReal,
-          eventoId: id
+      if (asientosACrear.length > 0) {
+        await prisma.asiento.createMany({
+          data: asientosACrear,
+          skipDuplicates: true
         });
+        console.log(`✅ ${asientosACrear.length} asientos creados para el evento ${id}`);
       }
-    }
-
-    // Crear todos los asientos en lote
-    if (asientosACrear.length > 0) {
-      await prisma.asiento.createMany({
-        data: asientosACrear,
-        skipDuplicates: true
-      });
-
-      console.log(`✅ Creados ${asientosACrear.length} asientos para el evento ${id}`);
     }
   }
 
@@ -423,19 +355,9 @@ export const updateEvento = async (id: string, data: UpdateEventoData) => {
 
 // ── ELIMINAR EVENTO ───────────────────────────────────────────────────
 export const deleteEvento = async (id: string) => {
-  // Verificar que el evento existe
-  const existe = await prisma.evento.findUnique({
-    where: { id }
-  });
+  const existe = await prisma.evento.findUnique({ where: { id } });
+  if (!existe) return false;
 
-  if (!existe) {
-    return false;
-  }
-
-  // Eliminar evento (CASCADE eliminará asientos y compras relacionados)
-  await prisma.evento.delete({
-    where: { id }
-  });
-
+  await prisma.evento.delete({ where: { id } });
   return true;
 };
