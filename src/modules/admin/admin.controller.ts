@@ -7,12 +7,14 @@ import {
   getAttendanceReport,
   getAgenciesRanking,
   exportToCSV,
+  getUsersList,
+  getUserPurchases,
 } from './admin.service';
 
 // ── DASHBOARD KPIs ─────────────────────────────────────────────
 export const getDashboard = async (req: AuthRequest, res: Response): Promise<void> => {
   try {
-    if (!req.user || req.user.rol !== 'ADMIN') {
+    if (!req.user || !req.user.isAdmin) {
       res.status(403).json({ error: 'Acceso denegado' });
       return;
     }
@@ -32,7 +34,7 @@ export const getDashboard = async (req: AuthRequest, res: Response): Promise<voi
 // ── REPORTES DE VENTAS ───────────────────────────────────────────
 export const getSales = async (req: AuthRequest, res: Response): Promise<void> => {
   try {
-    if (!req.user || req.user.rol !== 'ADMIN') {
+    if (!req.user || !req.user.isAdmin) {
       res.status(403).json({ error: 'Acceso denegado' });
       return;
     }
@@ -58,7 +60,7 @@ export const getSales = async (req: AuthRequest, res: Response): Promise<void> =
 // ── REPORTES DE ASISTENCIA ────────────────────────────────────────
 export const getAttendance = async (req: AuthRequest, res: Response): Promise<void> => {
   try {
-    if (!req.user || req.user.rol !== 'ADMIN') {
+    if (!req.user || !req.user.isAdmin) {
       res.status(403).json({ error: 'Acceso denegado' });
       return;
     }
@@ -80,7 +82,7 @@ export const getAttendance = async (req: AuthRequest, res: Response): Promise<vo
 // ── REPORTES POR AGENCIAS (RANKING) ───────────────────────────────
 export const getAgencies = async (req: AuthRequest, res: Response): Promise<void> => {
   try {
-    if (!req.user || req.user.rol !== 'ADMIN') {
+    if (!req.user || !req.user.isAdmin) {
       res.status(403).json({ error: 'Acceso denegado' });
       return;
     }
@@ -106,7 +108,7 @@ export const getAgencies = async (req: AuthRequest, res: Response): Promise<void
 // ── EXPORTAR A CSV/EXCEL ──────────────────────────────────────────
 export const exportData = async (req: AuthRequest, res: Response): Promise<void> => {
   try {
-    if (!req.user || req.user.rol !== 'ADMIN') {
+    if (!req.user || !req.user.isAdmin) {
       res.status(403).json({ error: 'Acceso denegado' });
       return;
     }
@@ -132,5 +134,51 @@ export const exportData = async (req: AuthRequest, res: Response): Promise<void>
   } catch (error) {
     console.error('❌ Error al exportar datos:', error);
     res.status(500).json({ error: 'Error al exportar datos' });
+  }
+};
+
+// ── GESTIÓN DE USUARIOS ───────────────────────────────────────────────
+export const getUsers = async (req: AuthRequest, res: Response): Promise<void> => {
+  try {
+    if (!req.user || !req.user.isAdmin) {
+      res.status(403).json({ error: 'Acceso denegado' });
+      return;
+    }
+
+    const usuarios = await getUsersList();
+
+    res.json({
+      success: true,
+      data: usuarios
+    });
+  } catch (error) {
+    console.error('❌ Error al obtener usuarios:', error);
+    res.status(500).json({ error: 'Error al obtener usuarios' });
+  }
+};
+
+export const getUserPurchasesHandler = async (req: AuthRequest, res: Response): Promise<void> => {
+  try {
+    if (!req.user || !req.user.isAdmin) {
+      res.status(403).json({ error: 'Acceso denegado' });
+      return;
+    }
+
+    const { userId } = req.params;
+
+    if (!userId) {
+      res.status(400).json({ error: 'ID de usuario es requerido' });
+      return;
+    }
+
+    const compras = await getUserPurchases(userId);
+
+    res.json({
+      success: true,
+      data: compras
+    });
+  } catch (error) {
+    console.error('❌ Error al obtener compras del usuario:', error);
+    res.status(500).json({ error: 'Error al obtener compras del usuario' });
   }
 };

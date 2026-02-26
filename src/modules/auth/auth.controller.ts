@@ -62,30 +62,48 @@ export const loginLocal = async (req: AuthRequest, res: Response): Promise<void>
       return;
     }
 
-    // Credenciales hardcodeadas para desarrollo
-    const ADMIN_EMAIL = 'administrador@gmail.com';
-    const ADMIN_PASSWORD = 'superadmin';
+    // Primero buscar en la tabla roles (administradores)
+    const adminUser = await prisma.rol.findUnique({
+      where: { email }
+    });
 
-    if (email === ADMIN_EMAIL && password === ADMIN_PASSWORD) {
-      // Buscar o crear usuario admin en la base de datos
-      let adminUser = await prisma.usuario.findUnique({
-        where: { email: ADMIN_EMAIL }
-      });
+    if (adminUser) {
+      // Verificar contraseña
+      const bcrypt = require('bcryptjs');
+      const passwordMatch = await bcrypt.compare(password, adminUser.password);
 
-      if (!adminUser) {
-        adminUser = await prisma.usuario.create({
-          data: {
-            email: ADMIN_EMAIL,
-            nombre: 'Administrador',
-            rol: 'ADMIN'
+      if (passwordMatch) {
+        const token = generateAuthToken({
+          id: adminUser.id,
+          email: adminUser.email,
+          rol: adminUser.tipoRol
+        });
+
+        res.json({
+          success: true,
+          message: 'Login exitoso',
+          token,
+          usuario: {
+            id: adminUser.id,
+            email: adminUser.email,
+            nombre: adminUser.nombre,
+            rol: adminUser.tipoRol,
+            isAdmin: true
           }
         });
+        return;
       }
+    }
 
+    // Si no es admin, buscar en usuarios normales
+    const normalUser = await prisma.usuario.findUnique({
+      where: { email }
+    });
+
+    if (normalUser) {
       const token = generateAuthToken({
-        id: adminUser.id,
-        email: adminUser.email,
-        rol: adminUser.rol
+        id: normalUser.id,
+        email: normalUser.email
       });
 
       res.json({
@@ -93,10 +111,10 @@ export const loginLocal = async (req: AuthRequest, res: Response): Promise<void>
         message: 'Login exitoso',
         token,
         usuario: {
-          id: adminUser.id,
-          email: adminUser.email,
-          nombre: adminUser.nombre,
-          rol: adminUser.rol
+          id: normalUser.id,
+          email: normalUser.email,
+          nombre: normalUser.nombre,
+          isAdmin: false
         }
       });
       return;
@@ -123,7 +141,6 @@ export const googleCallback = async (req: AuthRequest, res: Response): Promise<v
     const token = generateAuthToken({
       id: usuario.id,
       email: usuario.email,
-      rol: usuario.rol,
     });
 
     const needsCompletion = await needsProfileCompletion(usuario.id);
@@ -147,32 +164,21 @@ export const completeProfile = async (req: AuthRequest, res: Response): Promise<
       return;
     }
 
-    const { telefono, agencia } = req.body;
+    const { nombre, apellido, ci, telefono, agencia } = req.body;
 
-    if (!telefono || !agencia) {
+    if (!nombre || !apellido || !ci || !telefono || !agencia) {
       res.status(400).json({
         error: 'Datos incompletos',
-        message: 'Teléfono y agencia son obligatorios'
+        message: 'Nombre, apellido, CI, teléfono y agencia son obligatorios'
       });
       return;
     }
 
-    // Validar teléfono Bolivia: +591 XXXXXXXX
-    const telefonoRegex = /^\+?591\s?\d{8}$/;
-    if (!telefonoRegex.test(telefono.replace(/\s/g, ''))) {
-      res.status(400).json({
-        error: 'Teléfono inválido',
-        message: 'Formato válido: +591 XXXXXXXX'
-      });
-      return;
-    }
-
-    const usuarioActualizado = await completeUserProfile(req.user.id, { telefono, agencia });
+    const usuarioActualizado = await completeUserProfile(req.user.id, { nombre, apellido, ci, telefono, agencia });
 
     const token = generateAuthToken({
       id: usuarioActualizado.id,
       email: usuarioActualizado.email,
-      rol: usuarioActualizado.rol,
     });
 
     res.json({
@@ -183,9 +189,10 @@ export const completeProfile = async (req: AuthRequest, res: Response): Promise<
         id: usuarioActualizado.id,
         email: usuarioActualizado.email,
         nombre: usuarioActualizado.nombre,
+        apellido: usuarioActualizado.apellido,
+        ci: usuarioActualizado.ci,
         telefono: usuarioActualizado.telefono,
         agencia: usuarioActualizado.agencia,
-        rol: usuarioActualizado.rol,
       }
     });
   } catch (error) {

@@ -33,7 +33,11 @@ passport.use(
             });
           }
           console.log(`✅ Usuario existente autenticado: ${email}`);
-          return done(null, usuario);
+          return done(null, {
+            id: usuario.id,
+            email: usuario.email,
+            isAdmin: false
+          });
         }
 
         const nuevoUsuario = await prisma.usuario.create({
@@ -43,12 +47,15 @@ passport.use(
             googleId,
             telefono: '',
             agencia: '',
-            rol: 'USUARIO'
           }
         });
 
         console.log(`✅ Nuevo usuario creado: ${email}`);
-        return done(null, nuevoUsuario);
+        return done(null, {
+          id: nuevoUsuario.id,
+          email: nuevoUsuario.email,
+          isAdmin: false
+        });
 
       } catch (error) {
         console.error('❌ Error en autenticación con Google:', error);
@@ -65,7 +72,14 @@ passport.serializeUser((user: any, done) => {
 passport.deserializeUser(async (id: string, done) => {
   try {
     const usuario = await prisma.usuario.findUnique({ where: { id } });
-    done(null, usuario);
+    if (!usuario) {
+      return done(null, null);
+    }
+    done(null, {
+      id: usuario.id,
+      email: usuario.email,
+      isAdmin: false
+    });
   } catch (error) {
     done(error, null);
   }

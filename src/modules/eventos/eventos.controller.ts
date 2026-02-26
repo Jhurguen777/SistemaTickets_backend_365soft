@@ -58,7 +58,7 @@ export const getEvento = async (req: AuthRequest, res: Response): Promise<void> 
 // ── CREAR EVENTO (ADMIN) ───────────────────────────────────────────
 export const createEventoController = async (req: AuthRequest, res: Response): Promise<void> => {
   try {
-    if (!req.user || req.user.rol !== 'ADMIN') {
+    if (!req.user || !req.user.isAdmin) {
       res.status(403).json({ error: 'Acceso denegado' });
       return;
     }
@@ -85,7 +85,7 @@ export const createEventoController = async (req: AuthRequest, res: Response): P
 // ── ACTUALIZAR EVENTO (ADMIN) ────────────────────────────────────────
 export const updateEventoController = async (req: AuthRequest, res: Response): Promise<void> => {
   try {
-    if (!req.user || req.user.rol !== 'ADMIN') {
+    if (!req.user || !req.user.isAdmin) {
       res.status(403).json({ error: 'Acceso denegado' });
       return;
     }
@@ -105,16 +105,20 @@ export const updateEventoController = async (req: AuthRequest, res: Response): P
       message: 'Evento actualizado exitosamente',
       data: evento
     });
-  } catch (error) {
+  } catch (error: any) {
     console.error('❌ Error al actualizar evento:', error);
-    res.status(500).json({ error: 'Error al actualizar evento' });
+    res.status(500).json({
+      error: 'Error al actualizar evento',
+      message: error.message,
+      details: process.env.NODE_ENV === 'development' ? error.stack : undefined
+    });
   }
 };
 
 // ── ELIMINAR EVENTO (ADMIN) ──────────────────────────────────────────
 export const deleteEventoController = async (req: AuthRequest, res: Response): Promise<void> => {
   try {
-    if (!req.user || req.user.rol !== 'ADMIN') {
+    if (!req.user || !req.user.isAdmin) {
       res.status(403).json({ error: 'Acceso denegado' });
       return;
     }

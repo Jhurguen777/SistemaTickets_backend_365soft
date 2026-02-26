@@ -4,7 +4,8 @@ declare global {
     interface User {
       id: string;
       email: string;
-      rol: string;
+      tipoRol?: string;
+      isAdmin: boolean;
     }
   }
 }

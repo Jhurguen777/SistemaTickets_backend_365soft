@@ -325,3 +325,77 @@ export const exportToCSV = async (filters: ExportFilters): Promise<string> => {
 
   return csv;
 };
+
+// ── OBTENER USUARIOS ──────────────────────────────────────────────────
+export const getUsersList = async () => {
+  const usuarios = await prisma.usuario.findMany({
+    select: {
+      id: true,
+      email: true,
+      nombre: true,
+      apellido: true,
+      ci: true,
+      telefono: true,
+      agencia: true,
+      createdAt: true,
+      _count: {
+        select: {
+          compras: true,
+          asistencias: true,
+        }
+      }
+    },
+    orderBy: { createdAt: 'desc' }
+  });
+
+  // Transformar al formato que espera el frontend
+  return usuarios.map(usuario => {
+    // Calcular total gastado
+    const totalGastado = usuario._count.compras > 0
+      ? 0 // TODO: Calcular sum real de compras
+      : 0;
+
+    return {
+      id: usuario.id,
+      nombre: `${usuario.nombre}${usuario.apellido ? ' ' + usuario.apellido : ''}`,
+      email: usuario.email,
+      telefono: usuario.telefono || 'No registrado',
+      ci: usuario.ci || 'No registrado',
+      direccion: undefined,
+      ciudad: usuario.agencia || undefined,
+      estado: 'ACTIVO', // Todos los usuarios están activos por ahora
+      totalCompras: usuario._count.compras,
+      totalGastado,
+      ultimoAcceso: undefined, // No trackeamos último acceso todavía
+      createdAt: usuario.createdAt
+    };
+  });
+};
+
+// ── OBTENER COMPRAS DE USUARIO ────────────────────────────────────────
+export const getUserPurchases = async (userId: string) => {
+  const compras = await prisma.compra.findMany({
+    where: { usuarioId: userId },
+    include: {
+      evento: {
+        select: {
+          id: true,
+          titulo: true,
+          fecha: true
+        }
+      }
+    },
+    orderBy: { createdAt: 'desc' }
+  });
+
+  return compras.map(compra => ({
+    id: compra.id,
+    eventId: compra.evento.id,
+    eventTitle: compra.evento.titulo,
+    eventDate: new Date(compra.evento.fecha),
+    cantidad: 1, // TODO: Calcular cantidad correcta
+    totalPagado: compra.monto,
+    estadoPago: compra.estadoPago,
+    fechaCompra: compra.createdAt
+  }));
+};

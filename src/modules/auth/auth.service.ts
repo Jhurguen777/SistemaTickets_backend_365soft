@@ -4,6 +4,9 @@ import { generateToken } from '../../shared/utils/jwt';
 import bcrypt from 'bcrypt';
 
 export interface CompleteProfileData {
+  nombre: string;
+  apellido: string;
+  ci: string;
   telefono: string;
   agencia: string;
 }
@@ -15,19 +18,19 @@ export interface CompleteProfileData {
 export const generateAuthToken = (usuario: {
   id: string;
   email: string;
-  rol: string;
+  rol?: string;
 }) => {
   const token = generateToken({
-    id: usuario.id,        // Usar 'id' (no 'userId') para compatibilidad
+    id: usuario.id,
     email: usuario.email,
-    rol: usuario.rol,
+    ...(usuario.rol && { rol: usuario.rol }),
   });
 
   return token;
 };
 
 /**
- * Completar perfil del usuario (telefono y agencia)
+ * Completar perfil del usuario (apellido, telefono y agencia)
  * Se usa después del primer login con Google
  */
 export const completeUserProfile = async (
@@ -38,6 +41,9 @@ export const completeUserProfile = async (
     const usuario = await prisma.usuario.update({
       where: { id: userId },
       data: {
+        nombre: data.nombre,
+        apellido: data.apellido,
+        ci: data.ci,
         telefono: data.telefono,
         agencia: data.agencia,
       },
@@ -45,9 +51,10 @@ export const completeUserProfile = async (
         id: true,
         email: true,
         nombre: true,
+        apellido: true,
+        ci: true,
         telefono: true,
         agencia: true,
-        rol: true,
         googleId: true,
       }
     });
@@ -65,15 +72,15 @@ export const completeUserProfile = async (
 export const needsProfileCompletion = async (userId: string): Promise<boolean> => {
   const usuario = await prisma.usuario.findUnique({
     where: { id: userId },
-    select: { telefono: true, agencia: true }
+    select: { apellido: true, telefono: true, agencia: true }
   });
 
   if (!usuario) {
     return false;
   }
 
-  // Necesita completar si telefono o agencia están vacíos
-  return !usuario.telefono || !usuario.agencia;
+  // Necesita completar si apellido, telefono o agencia están vacíos
+  return !usuario.apellido || !usuario.telefono || !usuario.agencia;
 };
 
 /**
@@ -90,7 +97,6 @@ export const getUserProfile = async (userId: string) => {
         apellido: true,
         telefono: true,
         agencia: true,
-        rol: true,
         createdAt: true,
         _count: {
           select: {
@@ -137,14 +143,12 @@ export const registerLocal = async (data: {
         password: hashedPassword,
         nombre: data.nombre,
         apellido: data.apellido || null,
-        rol: 'USUARIO'
       },
       select: {
         id: true,
         email: true,
         nombre: true,
         apellido: true,
-        rol: true,
         createdAt: true
       }
     });
@@ -153,7 +157,6 @@ export const registerLocal = async (data: {
     const token = generateAuthToken({
       id: usuario.id,
       email: usuario.email,
-      rol: usuario.rol
     });
 
     return {

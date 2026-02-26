@@ -64,9 +64,9 @@ export interface QrInfo {
   estado: string;
   monto: number;
   moneda: string;
-  fechaVencimiento: Date;
+  fechaVencimiento?: Date;
   imagenQr?: string;
-  detalleGlosa: string;
+  detalleGlosa?: string;
 }
 
 export interface VerificarPagoResponse {

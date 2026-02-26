@@ -93,7 +93,7 @@ class ComprasService {
       }
 
       // 7. Crear registro en QrPagos
-      const qrPago = await prisma.qrPagos.create({
+      const qrPago = await prisma.qrPago.create({
         data: {
           alias,
           estado: EstadoQr.PENDIENTE,
@@ -159,7 +159,7 @@ class ComprasService {
   async verificarPago(qrId: string, usuarioId: string): Promise<VerificarPagoResponse> {
     try {
       // 1. Buscar el QR
-      const qrPago = await prisma.qrPagos.findUnique({
+      const qrPago = await prisma.qrPago.findUnique({
         where: { id: qrId },
         include: { compra: true }
       });
@@ -184,7 +184,7 @@ class ComprasService {
       const estadoAnterior = qrPago.estado;
       const estadoNuevo = responseBanco.objeto.estadoActual;
 
-      const qrPagoActualizado = await prisma.qrPagos.update({
+      const qrPagoActualizado = await prisma.qrPago.update({
         where: { id: qrId },
         data: {
           estado: estadoNuevo as EstadoQr,
@@ -216,7 +216,7 @@ class ComprasService {
           estado: qrPagoActualizado.estado,
           monto: qrPagoActualizado.monto,
           moneda: qrPagoActualizado.moneda,
-          fechaVencimiento: qrPagoActualizado.fechaVencimiento,
+          fechaVencimiento: qrPagoActualizado.fechaVencimiento || undefined,
           imagenQr: qrPagoActualizado.imagenQr || undefined,
           detalleGlosa: qrPagoActualizado.detalleGlosa || ''
         },
@@ -244,7 +244,7 @@ class ComprasService {
     try {
       await prisma.$transaction(async (tx) => {
         // 1. Obtener QR con compra
-        const qrPago = await tx.qrPagos.findUnique({
+        const qrPago = await tx.qrPago.findUnique({
           where: { id: qrPagoId },
           include: { compra: { include: { asiento: true } } }
         });
@@ -254,7 +254,7 @@ class ComprasService {
         }
 
         // 2. Actualizar QR a PAGADO
-        await tx.qrPagos.update({
+        await tx.qrPago.update({
           where: { id: qrPagoId },
           data: { estado: EstadoQr.PAGADO }
         });
@@ -300,7 +300,7 @@ class ComprasService {
       const alias = payload.alias;
 
       // 1. Buscar QR por alias
-      const qrPago = await prisma.qrPagos.findUnique({
+      const qrPago = await prisma.qrPago.findUnique({
         where: { alias }
       });
 
@@ -401,7 +401,7 @@ class ComprasService {
    */
   async cancelarQr(qrId: string, usuarioId: string): Promise<void> {
     try {
-      const qrPago = await prisma.qrPagos.findUnique({
+      const qrPago = await prisma.qrPago.findUnique({
         where: { id: qrId },
         include: { compra: true }
       });
@@ -424,7 +424,7 @@ class ComprasService {
 
       await prisma.$transaction(async (tx) => {
         // Actualizar QR a CANCELADO
-        await tx.qrPagos.update({
+        await tx.qrPago.update({
           where: { id: qrId },
           data: { estado: EstadoQr.CANCELADO }
         });
@@ -478,7 +478,7 @@ class ComprasService {
   async limpiarQrsVencidos(): Promise<void> {
     const ahora = new Date();
 
-    const qrsVencidos = await prisma.qrPagos.findMany({
+    const qrsVencidos = await prisma.qrPago.findMany({
       where: {
         estado: EstadoQr.PENDIENTE,
         fechaVencimiento: { lt: ahora }
@@ -489,7 +489,7 @@ class ComprasService {
     for (const qr of qrsVencidos) {
       await prisma.$transaction(async (tx) => {
         // Actualizar QR a VENCIDO
-        await tx.qrPagos.update({
+        await tx.qrPago.update({
           where: { id: qr.id },
           data: { estado: EstadoQr.VENCIDO }
         });
