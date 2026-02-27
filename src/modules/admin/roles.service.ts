@@ -66,7 +66,6 @@ export const createRol = async (data: CreateRolDTO) => {
     throw new Error('El email ya está registrado');
   }
 
-  // Hashear la contraseña
   const hashedPassword = await bcrypt.hash(data.password, 10);
 
   const rol = await prisma.adminRol.create({
@@ -94,7 +93,6 @@ export const createRol = async (data: CreateRolDTO) => {
 export const updateRol = async (id: string, data: UpdateRolDTO) => {
   const updateData: any = { ...data };
 
-  // Si se proporciona una nueva contraseña, hashearla
   if (data.password) {
     updateData.password = await bcrypt.hash(data.password, 10);
   }

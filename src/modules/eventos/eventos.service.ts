@@ -32,6 +32,7 @@ export interface CreateEventoData {
     nombre: string;
     precio: number;
     total: number;
+    disponible?: number;
   }>;
   seatMapConfig?: any;
 }
@@ -264,7 +265,7 @@ export const updateEvento = async (id: string, data: UpdateEventoData) => {
             nombre: s.nombre,
             precio: s.precio,
             total: s.total,
-            disponible: s.disponible
+            disponible: s.disponible ?? s.total  // ← fallback a total si viene undefined
           }))
         }
       })

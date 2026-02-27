@@ -33,16 +33,16 @@ export const authenticate = async (
       select: { id: true, email: true, tipoRol: true, estado: true }
     });
 
-    if (rol) {
-      if (rol.estado !== 'ACTIVO') {
+    if (adminRol) {
+      if (adminRol.estado !== 'ACTIVO') {
         res.status(403).json({ error: 'Cuenta de administrador inactiva' });
         return;
       }
 
       req.user = {
-        id: rol.id,
-        email: rol.email,
-        tipoRol: rol.tipoRol,
+        id:      adminRol.id,
+        email:   adminRol.email,
+        tipoRol: adminRol.tipoRol,
         isAdmin: true
       };
 
@@ -50,10 +50,16 @@ export const authenticate = async (
       return;
     }
 
-    // Si no es rol, buscar en usuarios normales
+    // 2️⃣ Buscar en usuarios normales
     const user = await prisma.usuario.findUnique({
       where: { id: decoded.id },
-      select: { id: true, email: true, nombre: true, telefono: true, agencia: true }
+      select: {
+        id:     true,
+        email:  true,
+        nombre: true,
+        rol:    true,    // enum Rol: USUARIO | ADMIN
+        activo: true
+      }
     });
 
     if (!user) {
@@ -61,10 +67,15 @@ export const authenticate = async (
       return;
     }
 
+    if (!user.activo) {
+      res.status(403).json({ error: 'Cuenta inactiva' });
+      return;
+    }
+
     req.user = {
-      id: user.id,
-      email: user.email,
-      isAdmin: false
+      id:      user.id,
+      email:   user.email,
+      isAdmin: user.rol === 'ADMIN'  // ← detecta enum Rol.ADMIN en tabla usuarios
     };
 
     next();
@@ -103,6 +114,7 @@ export const hasRole = (...allowedRoles: string[]) => {
       return;
     }
 
+    // SUPER_ADMIN tiene acceso a todo
     if (req.user.tipoRol === 'SUPER_ADMIN') {
       next();
       return;
