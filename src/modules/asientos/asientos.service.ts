@@ -18,32 +18,49 @@ export const getAsientosPorEvento = async (
   eventoId: string,
   userId?: string
 ): Promise<AsientoConEstadoReal[]> => {
-  const [asientos, locks] = await Promise.all([
-    prisma.asiento.findMany({
+  let locks: [any[], any[]];
+
+  try {
+    // Intentar obtener locks de Redis, pero fallar graceful si no está disponible
+    locks = await Promise.all([
+      prisma.asiento.findMany({
+        where: { eventoId },
+        orderBy: [{ fila: 'asc' }, { numero: 'asc' }],
+      }),
+      getLockedSeatsForEvent(eventoId).catch(() => []), // ✅ Si Redis falla, retorna array vacío
+    ]);
+  } catch (error) {
+    // Si Redis falla completamente, usar solo datos de BD
+    console.warn('⚠️  Redis no disponible, cargando asientos sin locks en tiempo real');
+    const asientos = await prisma.asiento.findMany({
       where: { eventoId },
       orderBy: [{ fila: 'asc' }, { numero: 'asc' }],
-    }),
-    getLockedSeatsForEvent(eventoId),
-  ]);
+    });
+    locks = [asientos, []];
+  }
 
-  const lockMap = new Map(locks.map((l) => [l.asientoId, l]));
+  const [asientos, lockedSeats] = locks;
+  const lockMap = new Map(lockedSeats.map((l: any) => [l.asientoId, l]));
 
-  return asientos.map((a) => {
-    const lock  = lockMap.get(a.id);
+  return asientos.map((a: any) => {
+    const lock = lockMap.get(a.id);
     const estado = lock && a.estado === EstadoAsiento.DISPONIBLE ? 'EN_PROCESO' : a.estado;
 
-    return {
-      id:       a.id,
-      numero:   a.numero,
-      fila:     a.fila,
-      precio:   a.precio,       // ✅
-      estado:   estado as EstadoAsiento | 'EN_PROCESO',
+    const result: AsientoConEstadoReal = {
+      id: a.id,
+      numero: a.numero,
+      fila: a.fila,
+      precio: a.precio,
+      estado: estado as EstadoAsiento | 'EN_PROCESO',
       eventoId: a.eventoId,
-      ...(lock && {
-        lockedByMe:  userId ? lock.userId === userId : false,
-        ttlSegundos: lock.ttlSeconds,
-      }),
     };
+
+    if (lock) {
+      result.lockedByMe = userId ? lock.userId === userId : false;
+      result.ttlSegundos = lock.ttlSeconds;
+    }
+
+    return result;
   });
 };
 

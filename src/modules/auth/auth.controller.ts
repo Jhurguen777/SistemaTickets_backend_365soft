@@ -63,7 +63,7 @@ export const loginLocal = async (req: AuthRequest, res: Response): Promise<void>
     }
 
     // Primero buscar en la tabla roles (administradores)
-    const adminUser = await prisma.rol.findUnique({
+    const adminUser = await prisma.adminRol.findUnique({
       where: { email }
     });
 

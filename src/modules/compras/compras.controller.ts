@@ -302,7 +302,7 @@ class ComprasController {
       const prisma = (await import('@prisma/client')).PrismaClient;
       const prismaClient = new prisma();
 
-      const qrPago = await prismaClient.qrPago.findUnique({
+      const qrPago = await prismaClient.qrPagos.findUnique({
         where: { id: qrId },
         include: {
           compra: {

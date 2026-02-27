@@ -38,6 +38,7 @@ export interface IniciarPagoResponse {
   success: boolean;
   message: string;
   compra?: CompraCreada;
+  qrPago?: QrInfo;
 }
 
 export interface CompraCreada {
@@ -49,6 +50,7 @@ export interface CompraCreada {
   moneda: string;
   estadoPago: string;
   qrCode: string;
+  qrPagoId?: string;
   createdAt: Date;
 }
 
@@ -65,7 +67,7 @@ export interface QrInfo {
   monto: number;
   moneda: string;
   fechaVencimiento?: Date;
-  imagenQr?: string;
+  imagenQr?: string | null;
   detalleGlosa?: string;
 }
 

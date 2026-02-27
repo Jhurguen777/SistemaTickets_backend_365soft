@@ -15,11 +15,13 @@ export const asientosRouter = (io: SocketIOServer): Router => {
   const router = Router();
   const withIO = injectIO(io);
 
-  // Todos los endpoints requieren JWT: Authorization: Bearer <token>
-  router.get('/evento/:eventoId', authMiddleware, getAsientosEvento);
-  router.get('/:id',              authMiddleware, getAsiento);
-  router.post('/reservar',        authMiddleware, withIO, reservar);
-  router.post('/liberar',         authMiddleware, withIO, liberar);
+  // Públicos (no requieren autenticación)
+  router.get('/evento/:eventoId', getAsientosEvento); // ✅ Público - cualquiera puede ver asientos
+
+  // Endpoints que requieren autenticación
+  router.get('/:id',        authMiddleware, getAsiento);
+  router.post('/reservar',  authMiddleware, withIO, reservar);
+  router.post('/liberar',   authMiddleware, withIO, liberar);
 
   return router;
 };

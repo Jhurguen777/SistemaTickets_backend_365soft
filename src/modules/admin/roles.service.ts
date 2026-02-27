@@ -19,7 +19,7 @@ export interface UpdateRolDTO {
 
 // Obtener todos los roles
 export const getAllRoles = async () => {
-  const roles = await prisma.rol.findMany({
+  const roles = await prisma.adminRol.findMany({
     select: {
       id: true,
       nombre: true,
@@ -38,7 +38,7 @@ export const getAllRoles = async () => {
 
 // Obtener un rol por ID
 export const getRolById = async (id: string) => {
-  const rol = await prisma.rol.findUnique({
+  const rol = await prisma.adminRol.findUnique({
     where: { id },
     select: {
       id: true,
@@ -58,7 +58,7 @@ export const getRolById = async (id: string) => {
 // Crear un nuevo rol
 export const createRol = async (data: CreateRolDTO) => {
   // Verificar si el email ya existe
-  const existing = await prisma.rol.findUnique({
+  const existing = await prisma.adminRol.findUnique({
     where: { email: data.email }
   });
 
@@ -69,7 +69,7 @@ export const createRol = async (data: CreateRolDTO) => {
   // Hashear la contraseña
   const hashedPassword = await bcrypt.hash(data.password, 10);
 
-  const rol = await prisma.rol.create({
+  const rol = await prisma.adminRol.create({
     data: {
       nombre: data.nombre,
       email: data.email,
@@ -99,7 +99,7 @@ export const updateRol = async (id: string, data: UpdateRolDTO) => {
     updateData.password = await bcrypt.hash(data.password, 10);
   }
 
-  const rol = await prisma.rol.update({
+  const rol = await prisma.adminRol.update({
     where: { id },
     data: updateData,
     select: {
@@ -118,14 +118,14 @@ export const updateRol = async (id: string, data: UpdateRolDTO) => {
 
 // Eliminar un rol
 export const deleteRol = async (id: string) => {
-  await prisma.rol.delete({
+  await prisma.adminRol.delete({
     where: { id }
   });
 };
 
 // Actualizar último acceso
 export const updateUltimoAcceso = async (id: string) => {
-  await prisma.rol.update({
+  await prisma.adminRol.update({
     where: { id },
     data: { ultimoAcceso: new Date() }
   });
