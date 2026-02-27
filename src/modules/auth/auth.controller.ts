@@ -60,10 +60,10 @@ export const loginLocal = async (req: AuthRequest, res: Response): Promise<void>
       return;
     }
 
-    const bcrypt = require('bcryptjs');
-
-    // 1️⃣ Buscar en AdminRol
-    const adminUser = await prisma.adminRol.findUnique({ where: { email } });
+    // Primero buscar en la tabla roles (administradores)
+    const adminUser = await prisma.adminRol.findUnique({
+      where: { email }
+    });
 
     if (adminUser) {
       // Si existe el email pero la contraseña es incorrecta → error inmediato

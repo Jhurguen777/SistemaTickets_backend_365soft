@@ -37,7 +37,7 @@ export function setupSocketHandlers(io: Server) {
 
     // ── RESERVAR ASIENTO ────────────────────────────────────
     socket.on('reservar_asiento', async (data: ReservarAsientoPayload) => {
-      const { eventoId, asientoId, userId } = data;
+      const { eventoId, asientoId } = data;
 
       try {
         const asiento = await prisma.asiento.findUnique({ where: { id: asientoId } });
@@ -65,35 +65,24 @@ export function setupSocketHandlers(io: Server) {
           data: { estado: 'RESERVANDO', reservadoEn: new Date() },
         });
 
-        const compra = await prisma.compra.create({
-          data: {
-            usuarioId: userId,
-            eventoId,
-            asientoId,
-            monto: 0,
-            qrCode: `QR-${asientoId}-${userId}-${Date.now()}`,
-          },
-          include: {
-            asiento: { select: { fila: true, numero: true } },
-            evento:  { select: { titulo: true, precio: true } },
-          },
-        });
-
+        // ✅ Ya no creamos compra aquí - eso lo hace el endpoint /api/compras/iniciar-pago
+        // Solo emitimos confirmación al cliente
         socket.emit('reserva_exitosa', {
-          compraId: compra.id,
           asientoId,
-          fila: compra.asiento.fila,
-          numero: compra.asiento.numero,
-          evento: compra.evento.titulo,
-          precio: compra.evento.precio,
+          eventoId,
           expiraEn: TIEMPO_RESERVA_MS / 1000,
+          mensaje: 'Asiento reservado. Procede al pago para completar la compra.'
         });
 
-        // Notificar a todos en la sala
-        io.to(`evento_${eventoId}`).emit('asiento_actualizado', {
-          asientoId,
-          estado: 'RESERVANDO',
-        });
+        // Notificar a todos en la sala (con manejo de error por si Redis falla)
+        try {
+          io.to(`evento_${eventoId}`).emit('asiento_actualizado', {
+            asientoId,
+            estado: 'RESERVANDO',
+          });
+        } catch (broadcastError) {
+          console.warn('⚠️  No se pudo hacer broadcast (Redis no disponible):', broadcastError);
+        }
 
       } catch {
         socket.emit('reserva_fallida', { error: 'Error interno al reservar el asiento' });
@@ -105,10 +94,14 @@ export function setupSocketHandlers(io: Server) {
       try {
         const liberados = await sincronizarAsientosExpirados(eventoId);
         if (liberados > 0) {
-          io.to(`evento_${eventoId}`).emit('asiento_actualizado', {
-            tipo: 'expirados',
-            cantidad: liberados,
-          });
+          try {
+            io.to(`evento_${eventoId}`).emit('asiento_actualizado', {
+              tipo: 'expirados',
+              cantidad: liberados,
+            });
+          } catch (broadcastError) {
+            console.warn('⚠️  No se pudo hacer broadcast (Redis no disponible):', broadcastError);
+          }
         }
         socket.emit('asiento:sincronizar-ok', { eventoId, liberados });
       } catch {

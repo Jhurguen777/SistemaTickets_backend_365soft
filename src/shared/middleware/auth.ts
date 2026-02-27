@@ -27,8 +27,8 @@ export const authenticate = async (
 
     const decoded = jwt.verify(token, process.env.JWT_SECRET || 'secret') as { id: string };
 
-    // 1️⃣ Buscar en AdminRol (tabla "roles")
-    const adminRol = await prisma.adminRol.findUnique({
+    // Primero buscar en la tabla de roles (administradores)
+    const rol = await prisma.adminRol.findUnique({
       where: { id: decoded.id },
       select: { id: true, email: true, tipoRol: true, estado: true }
     });

@@ -28,6 +28,7 @@ const handleError = (res: Response, err: unknown) => {
 
 // GET /api/asientos/evento/:eventoId
 // Llamar al montar el mapa de asientos — estado combina BD + Redis
+// PÚBLICO - no requiere autenticación
 export const getAsientosEvento = async (req: AuthRequest, res: Response): Promise<void> => {
   try {
     const asientos = await getAsientosPorEvento(req.params.eventoId, req.user?.id);

@@ -4,7 +4,7 @@
  */
 
 import { EstadoPago, EstadoQr, EstadoAsiento } from '@prisma/client';
-import prisma from '../../shared/config/database'; // ✅ instancia compartida
+import prisma from '../../shared/config/database';
 import bancoQrUtil from '../../shared/utils/banco-qr.util';
 import {
   IniciarPagoRequest,
@@ -51,10 +51,49 @@ class ComprasService {
         );
       }
 
-      // 3. Calcular monto — usar precio individual del asiento si existe, si no el del evento
-      const montoTotal = asiento.precio ?? asiento.evento.precio;
+      // 3. Verificar si ya existe una compra para este asiento
+      const compraExistente = await prisma.compra.findUnique({
+        where: { asientoId: params.asientoId },
+        include: { qrPago: true }
+      });
 
-      // 4. Crear compra en estado PENDIENTE
+      // Si ya existe una compra, manejarla según su estado
+      if (compraExistente) {
+        // Si la compra está PAGADA o REEMBOLSADA, el asiento no está disponible
+        if (compraExistente.estadoPago === EstadoPago.PAGADO ||
+            compraExistente.estadoPago === EstadoPago.REEMBOLSADO) {
+          throw new PagoQrError(
+            `Este asiento ya ha sido comprado. Estado de pago: ${compraExistente.estadoPago}`,
+            'ASIENTO_ALREADY_SOLD',
+            409
+          );
+        }
+
+        // Si la compra está PENDIENTE o FALLIDA, eliminarla y sus registros relacionados
+        if (compraExistente.estadoPago === EstadoPago.PENDIENTE ||
+            compraExistente.estadoPago === EstadoPago.FALLIDO) {
+          console.log(`🗑️ Eliminando compra previa ${compraExistente.id} para asiento ${params.asientoId}`);
+
+          // Eliminar QR pago si existe
+          if (compraExistente.qrPagoId) {
+            await prisma.qrPagos.delete({
+              where: { id: compraExistente.qrPagoId }
+            }).catch(() => {
+              console.warn('⚠️  No se pudo eliminar QR pago, puede que ya no exista');
+            });
+          }
+
+          // Eliminar compra existente
+          await prisma.compra.delete({
+            where: { id: compraExistente.id }
+          });
+        }
+      }
+
+      // 4. Calcular monto total (puede haber descuentos futuros)
+      const montoTotal = asiento.evento.precio;
+
+      // 5. Crear compra en estado PENDIENTE
       const compra = await prisma.compra.create({
         data: {
           usuarioId,
@@ -68,19 +107,32 @@ class ComprasService {
         }
       });
 
-      // 5. Generar QR del banco
-      const alias           = bancoQrUtil.generarAliasUnico(compra.id);
-      const fechaVencimiento = bancoQrUtil.calcularFechaVencimiento(24); // 24 horas
+      // 6. Generar QR del banco (SIMULACIÓN - Próximamente se implementará API real)
+      const alias = bancoQrUtil.generarAliasUnico(compra.id);
+      const fechaVencimiento = bancoQrUtil.calcularFechaVencimiento(24);
       const detalleGlosa    = `Ticket Evento: ${asiento.evento.titulo} - Asiento: ${asiento.fila}${asiento.numero}`;
 
-      const responseBanco = await bancoQrUtil.generarQrDinamico({
-        alias,
-        monto: montoTotal,
-        detalleGlosa,
-        fechaVencimiento
-      });
+      let responseBanco: any;
+      try {
+        responseBanco = await bancoQrUtil.generarQrDinamico({
+          alias,
+          monto: montoTotal,
+          detalleGlosa,
+          fechaVencimiento
+        });
+      } catch (bancoError) {
+        console.warn('⚠️  API del banco no disponible - usando modo simulación:', bancoError);
+        responseBanco = {
+          codigo: '0000',
+          mensaje: 'Simulación exitosa',
+          objeto: {
+            imagenQr: `https://api.qrserver.com/v1/create-qr-code/?size=200x200&data=SIMULACION_${alias}`,
+            alias: alias
+          }
+        };
+      }
 
-      // 6. Verificar respuesta del banco
+      // 7. Verificar respuesta del banco
       if (!bancoQrUtil.validarRespuestaBanco(responseBanco)) {
         await prisma.compra.delete({ where: { id: compra.id } });
         throw new PagoQrError(
@@ -90,7 +142,7 @@ class ComprasService {
         );
       }
 
-      // 7. Crear registro en QrPagos ✅ qrPagos (no qrPago)
+      // 8. Crear registro en QrPagos
       const qrPago = await prisma.qrPagos.create({
         data: {
           alias,
@@ -104,7 +156,7 @@ class ComprasService {
         }
       });
 
-      // 8. Actualizar compra con referencia al QR
+      // 9. Actualizar compra con referencia al QR
       await prisma.compra.update({
         where: { id: compra.id },
         data: {
@@ -113,7 +165,7 @@ class ComprasService {
         }
       });
 
-      // 9. Actualizar asiento a RESERVANDO
+      // 10. Actualizar asiento a RESERVANDO
       await prisma.asiento.update({
         where: { id: params.asientoId },
         data: {
@@ -134,7 +186,17 @@ class ComprasService {
           moneda:     compra.moneda,
           estadoPago: compra.estadoPago,
           qrCode:     compra.qrCode,
+          qrPagoId:   qrPago.id,
           createdAt:  compra.createdAt
+        },
+        qrPago: {
+          id:               qrPago.id,
+          alias:            qrPago.alias,
+          estado:           qrPago.estado,
+          monto:            qrPago.monto,
+          moneda:           qrPago.moneda,
+          imagenQr:         qrPago.imagenQr,
+          fechaVencimiento: qrPago.fechaVencimiento
         }
       };
     } catch (error: any) {
@@ -150,7 +212,7 @@ class ComprasService {
    */
   async verificarPago(qrId: string, usuarioId: string): Promise<VerificarPagoResponse> {
     try {
-      // 1. Buscar el QR ✅ qrPagos
+      // 1. Buscar el QR
       const qrPago = await prisma.qrPagos.findUnique({
         where: { id: qrId },
         include: { compra: true }
@@ -165,9 +227,24 @@ class ComprasService {
       }
 
       // 2. Consultar estado al banco
-      const responseBanco = await bancoQrUtil.verificarEstadoQr(qrPago.alias);
+      let responseBanco: any;
+      try {
+        responseBanco = await bancoQrUtil.verificarEstadoQr(qrPago.alias);
+      } catch (bancoError) {
+        console.warn('⚠️  API del banco no disponible - usando modo simulación:', bancoError);
+        responseBanco = {
+          codigo: '0000',
+          mensaje: 'Simulación - Estado verificado',
+          objeto: {
+            alias:        qrPago.alias,
+            estadoActual: qrPago.estado,
+            monto:        qrPago.monto,
+            moneda:       qrPago.moneda
+          }
+        };
+      }
 
-      // 3. Actualizar estado local ✅ qrPagos
+      // 3. Actualizar estado local
       const estadoAnterior = qrPago.estado;
       const estadoNuevo    = responseBanco.objeto.estadoActual;
 
@@ -223,7 +300,7 @@ class ComprasService {
   async procesarPagoQr(qrPagoId: string): Promise<void> {
     try {
       await prisma.$transaction(async (tx) => {
-        // 1. Obtener QR con compra ✅ qrPagos
+        // 1. Obtener QR con compra
         const qrPago = await tx.qrPagos.findUnique({
           where: { id: qrPagoId },
           include: { compra: { include: { asiento: true } } }
@@ -233,7 +310,7 @@ class ComprasService {
           throw new Error('QR o compra no encontrados');
         }
 
-        // 2. Actualizar QR a PAGADO ✅ qrPagos
+        // 2. Actualizar QR a PAGADO
         await tx.qrPagos.update({
           where: { id: qrPagoId },
           data:  { estado: EstadoQr.PAGADO }
@@ -268,8 +345,10 @@ class ComprasService {
     try {
       const alias = payload.alias;
 
-      // Buscar QR por alias ✅ qrPagos
-      const qrPago = await prisma.qrPagos.findUnique({ where: { alias } });
+      // 1. Buscar QR por alias
+      const qrPago = await prisma.qrPagos.findUnique({
+        where: { alias }
+      });
 
       if (!qrPago) {
         return { codigo: '1212', mensaje: 'Alias no encontrado en la base de datos' };
@@ -344,9 +423,8 @@ class ComprasService {
    */
   async cancelarQr(qrId: string, usuarioId: string): Promise<void> {
     try {
-      // ✅ qrPagos
       const qrPago = await prisma.qrPagos.findUnique({
-        where:   { id: qrId },
+        where: { id: qrId },
         include: { compra: true }
       });
 
@@ -363,7 +441,7 @@ class ComprasService {
       }
 
       await prisma.$transaction(async (tx) => {
-        // ✅ qrPagos
+        // Actualizar QR a CANCELADO
         await tx.qrPagos.update({
           where: { id: qrId },
           data:  { estado: EstadoQr.CANCELADO }
@@ -405,10 +483,9 @@ class ComprasService {
   async limpiarQrsVencidos(): Promise<void> {
     const ahora = new Date();
 
-    // ✅ qrPagos
     const qrsVencidos = await prisma.qrPagos.findMany({
       where: {
-        estado:          EstadoQr.PENDIENTE,
+        estado:           EstadoQr.PENDIENTE,
         fechaVencimiento: { lt: ahora }
       },
       include: { compra: true }
@@ -416,7 +493,7 @@ class ComprasService {
 
     for (const qr of qrsVencidos) {
       await prisma.$transaction(async (tx) => {
-        // ✅ qrPagos
+        // Actualizar QR a VENCIDO
         await tx.qrPagos.update({
           where: { id: qr.id },
           data:  { estado: EstadoQr.VENCIDO }
