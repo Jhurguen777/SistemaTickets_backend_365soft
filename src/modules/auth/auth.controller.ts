@@ -15,7 +15,6 @@ export const register = async (req: AuthRequest, res: Response): Promise<void> =
   try {
     const { email, password, nombre, apellido } = req.body;
 
-    // Validaciones
     if (!email || !password || !nombre) {
       res.status(400).json({ error: 'Email, contraseña y nombre son requeridos' });
       return;
@@ -31,7 +30,6 @@ export const register = async (req: AuthRequest, res: Response): Promise<void> =
       return;
     }
 
-    // Registrar usuario
     const result = await registerUserService({ email, password, nombre, apellido });
 
     res.status(201).json({
@@ -52,7 +50,7 @@ export const register = async (req: AuthRequest, res: Response): Promise<void> =
   }
 };
 
-// ── LOGIN LOCAL (SOLO PARA DESARROLLO) ─────────────────────
+// ── LOGIN LOCAL ─────────────────────────────────────────────
 export const loginLocal = async (req: AuthRequest, res: Response): Promise<void> => {
   try {
     const { email, password } = req.body;
@@ -62,48 +60,34 @@ export const loginLocal = async (req: AuthRequest, res: Response): Promise<void>
       return;
     }
 
-    // Primero buscar en la tabla roles (administradores)
-    const adminUser = await prisma.rol.findUnique({
-      where: { email }
-    });
+    const bcrypt = require('bcryptjs');
+
+    // 1️⃣ Buscar en AdminRol
+    const adminUser = await prisma.adminRol.findUnique({ where: { email } });
 
     if (adminUser) {
-      // Verificar contraseña
-      const bcrypt = require('bcryptjs');
+      // Si existe el email pero la contraseña es incorrecta → error inmediato
       const passwordMatch = await bcrypt.compare(password, adminUser.password);
-
-      if (passwordMatch) {
-        const token = generateAuthToken({
-          id: adminUser.id,
-          email: adminUser.email,
-          rol: adminUser.tipoRol
-        });
-
-        res.json({
-          success: true,
-          message: 'Login exitoso',
-          token,
-          usuario: {
-            id: adminUser.id,
-            email: adminUser.email,
-            nombre: adminUser.nombre,
-            rol: adminUser.tipoRol,
-            isAdmin: true
-          }
-        });
+      if (!passwordMatch) {
+        res.status(401).json({ error: 'Credenciales inválidas' });
         return;
       }
-    }
 
-    // Si no es admin, buscar en usuarios normales
-    const normalUser = await prisma.usuario.findUnique({
-      where: { email }
-    });
+      if (adminUser.estado !== 'ACTIVO') {
+        res.status(403).json({ error: 'Cuenta de administrador inactiva' });
+        return;
+      }
 
-    if (normalUser) {
+      // Actualizar último acceso
+      await prisma.adminRol.update({
+        where: { id: adminUser.id },
+        data: { ultimoAcceso: new Date() }
+      });
+
       const token = generateAuthToken({
-        id: normalUser.id,
-        email: normalUser.email
+        id:    adminUser.id,
+        email: adminUser.email,
+        rol:   adminUser.tipoRol
       });
 
       res.json({
@@ -111,16 +95,51 @@ export const loginLocal = async (req: AuthRequest, res: Response): Promise<void>
         message: 'Login exitoso',
         token,
         usuario: {
-          id: normalUser.id,
-          email: normalUser.email,
-          nombre: normalUser.nombre,
-          isAdmin: false
+          id:      adminUser.id,
+          email:   adminUser.email,
+          nombre:  adminUser.nombre,
+          tipoRol: adminUser.tipoRol,
+          isAdmin: true
         }
       });
       return;
     }
 
-    res.status(401).json({ error: 'Credenciales inválidas' });
+    // 2️⃣ Buscar en usuarios normales
+    const normalUser = await prisma.usuario.findUnique({ where: { email } });
+
+    if (!normalUser || !normalUser.password) {
+      res.status(401).json({ error: 'Credenciales inválidas' });
+      return;
+    }
+
+    const passwordMatch = await bcrypt.compare(password, normalUser.password);
+    if (!passwordMatch) {
+      res.status(401).json({ error: 'Credenciales inválidas' });
+      return;
+    }
+
+    if (!normalUser.activo) {
+      res.status(403).json({ error: 'Cuenta inactiva' });
+      return;
+    }
+
+    const token = generateAuthToken({
+      id:    normalUser.id,
+      email: normalUser.email
+    });
+
+    res.json({
+      success: true,
+      message: 'Login exitoso',
+      token,
+      usuario: {
+        id:      normalUser.id,
+        email:   normalUser.email,
+        nombre:  normalUser.nombre,
+        isAdmin: false
+      }
+    });
   } catch (error) {
     console.error('❌ Error en loginLocal:', error);
     res.status(500).json({ error: 'Error al iniciar sesión' });
@@ -130,7 +149,6 @@ export const loginLocal = async (req: AuthRequest, res: Response): Promise<void>
 // ── GOOGLE CALLBACK ──────────────────────────────────────────
 export const googleCallback = async (req: AuthRequest, res: Response): Promise<void> => {
   try {
-    // Passport adjunta el usuario en req.user después de autenticar
     const usuario = req.user;
 
     if (!usuario) {
@@ -139,7 +157,7 @@ export const googleCallback = async (req: AuthRequest, res: Response): Promise<v
     }
 
     const token = generateAuthToken({
-      id: usuario.id,
+      id:    usuario.id,
       email: usuario.email,
     });
 
@@ -177,7 +195,7 @@ export const completeProfile = async (req: AuthRequest, res: Response): Promise<
     const usuarioActualizado = await completeUserProfile(req.user.id, { nombre, apellido, ci, telefono, agencia });
 
     const token = generateAuthToken({
-      id: usuarioActualizado.id,
+      id:    usuarioActualizado.id,
       email: usuarioActualizado.email,
     });
 
@@ -186,13 +204,13 @@ export const completeProfile = async (req: AuthRequest, res: Response): Promise<
       message: 'Perfil completado exitosamente',
       token,
       usuario: {
-        id: usuarioActualizado.id,
-        email: usuarioActualizado.email,
-        nombre: usuarioActualizado.nombre,
+        id:       usuarioActualizado.id,
+        email:    usuarioActualizado.email,
+        nombre:   usuarioActualizado.nombre,
         apellido: usuarioActualizado.apellido,
-        ci: usuarioActualizado.ci,
+        ci:       usuarioActualizado.ci,
         telefono: usuarioActualizado.telefono,
-        agencia: usuarioActualizado.agencia,
+        agencia:  usuarioActualizado.agencia,
       }
     });
   } catch (error) {
@@ -209,6 +227,34 @@ export const getMe = async (req: AuthRequest, res: Response): Promise<void> => {
       return;
     }
 
+    // 1️⃣ Si es admin, buscar en AdminRol
+    if (req.user.isAdmin) {
+      const admin = await prisma.adminRol.findUnique({
+        where: { id: req.user.id },
+        select: {
+          id:           true,
+          email:        true,
+          nombre:       true,
+          tipoRol:      true,
+          estado:       true,
+          ultimoAcceso: true,
+          createdAt:    true,
+        }
+      });
+
+      if (!admin) {
+        res.status(404).json({ error: 'Administrador no encontrado' });
+        return;
+      }
+
+      res.json({
+        success: true,
+        usuario: { ...admin, isAdmin: true }
+      });
+      return;
+    }
+
+    // 2️⃣ Usuario normal
     const perfil = await getUserProfile(req.user.id);
 
     if (!perfil) {
@@ -216,7 +262,10 @@ export const getMe = async (req: AuthRequest, res: Response): Promise<void> => {
       return;
     }
 
-    res.json({ success: true, usuario: perfil });
+    res.json({
+      success: true,
+      usuario: { ...perfil, isAdmin: false }
+    });
   } catch (error) {
     console.error('❌ Error al obtener perfil:', error);
     res.status(500).json({ error: 'Error al obtener perfil' });

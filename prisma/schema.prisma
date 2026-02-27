@@ -19,7 +19,7 @@ model Usuario {
   nombre      String
   apellido    String?
   password    String?
-  ci          String?      // ← agregado desde main
+  ci          String?
   telefono    String?
   agencia     String?
   googleId    String?      @unique
@@ -36,7 +36,6 @@ model Usuario {
 
 // ============================================
 // ROLES DE ADMINISTRACIÓN
-// (modelo de main, renombrado AdminRol para no chocar con el enum Rol)
 // ============================================
 
 model AdminRol {
@@ -114,7 +113,7 @@ model Asiento {
   eventoId    String
   fila        String
   numero      Int
-  precio      Float?        // ✅ precio individual — null = heredar del evento/sector
+  precio      Float?
   estado      EstadoAsiento @default(DISPONIBLE)
   reservadoEn DateTime?
   createdAt   DateTime      @default(now())
@@ -129,7 +128,7 @@ model Asiento {
 }
 
 // ============================================
-// PAGOS QR — se mantiene versión de modulo-de-asistencia (más completa)
+// PAGOS QR
 // ============================================
 
 model QrPagos {
@@ -158,7 +157,7 @@ model QrPagos {
 }
 
 // ============================================
-// COMPRAS — se mantiene versión de modulo-de-asistencia (más completa)
+// COMPRAS
 // ============================================
 
 model Compra {
