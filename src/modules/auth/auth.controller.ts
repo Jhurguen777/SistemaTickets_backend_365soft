@@ -66,7 +66,6 @@ export const loginLocal = async (req: AuthRequest, res: Response): Promise<void>
     const adminUser = await prisma.adminRol.findUnique({ where: { email } });
 
     if (adminUser) {
-      // Si existe el email pero la contraseña es incorrecta → error inmediato
       const passwordMatch = await bcrypt.compare(password, adminUser.password);
       if (!passwordMatch) {
         res.status(401).json({ error: 'Credenciales inválidas' });
@@ -78,7 +77,6 @@ export const loginLocal = async (req: AuthRequest, res: Response): Promise<void>
         return;
       }
 
-      // Actualizar último acceso
       await prisma.adminRol.update({
         where: { id: adminUser.id },
         data: { ultimoAcceso: new Date() }
@@ -105,8 +103,18 @@ export const loginLocal = async (req: AuthRequest, res: Response): Promise<void>
       return;
     }
 
-    // 2️⃣ Buscar en usuarios normales
-    const normalUser = await prisma.usuario.findUnique({ where: { email } });
+    // 2️⃣ Buscar en usuarios normales — ahora trae el campo `rol`
+    const normalUser = await prisma.usuario.findUnique({
+      where: { email },
+      select: {
+        id:       true,
+        email:    true,
+        nombre:   true,
+        password: true,
+        activo:   true,
+        rol:      true,   // ← AGREGADO: necesario para detectar ADMIN
+      }
+    });
 
     if (!normalUser || !normalUser.password) {
       res.status(401).json({ error: 'Credenciales inválidas' });
@@ -124,9 +132,12 @@ export const loginLocal = async (req: AuthRequest, res: Response): Promise<void>
       return;
     }
 
+    const isAdmin = normalUser.rol === 'ADMIN'; // ← AGREGADO
+
     const token = generateAuthToken({
       id:    normalUser.id,
-      email: normalUser.email
+      email: normalUser.email,
+      ...(isAdmin && { rol: normalUser.rol }) // ← incluir rol en el token si es admin
     });
 
     res.json({
@@ -137,7 +148,8 @@ export const loginLocal = async (req: AuthRequest, res: Response): Promise<void>
         id:      normalUser.id,
         email:   normalUser.email,
         nombre:  normalUser.nombre,
-        isAdmin: false
+        rol:     normalUser.rol,
+        isAdmin: isAdmin  // ← CORREGIDO: ya no es siempre false
       }
     });
   } catch (error) {
@@ -227,8 +239,8 @@ export const getMe = async (req: AuthRequest, res: Response): Promise<void> => {
       return;
     }
 
-    // 1️⃣ Si es admin, buscar en AdminRol
-    if (req.user.isAdmin) {
+    // 1️⃣ Si es admin de tabla AdminRol
+    if (req.user.isAdmin && req.user.tipoRol) {
       const admin = await prisma.adminRol.findUnique({
         where: { id: req.user.id },
         select: {
@@ -242,19 +254,16 @@ export const getMe = async (req: AuthRequest, res: Response): Promise<void> => {
         }
       });
 
-      if (!admin) {
-        res.status(404).json({ error: 'Administrador no encontrado' });
+      if (admin) {
+        res.json({
+          success: true,
+          usuario: { ...admin, isAdmin: true }
+        });
         return;
       }
-
-      res.json({
-        success: true,
-        usuario: { ...admin, isAdmin: true }
-      });
-      return;
     }
 
-    // 2️⃣ Usuario normal
+    // 2️⃣ Usuario normal (incluyendo usuarios con rol ADMIN en tabla usuarios)
     const perfil = await getUserProfile(req.user.id);
 
     if (!perfil) {
@@ -264,7 +273,7 @@ export const getMe = async (req: AuthRequest, res: Response): Promise<void> => {
 
     res.json({
       success: true,
-      usuario: { ...perfil, isAdmin: false }
+      usuario: { ...perfil, isAdmin: req.user.isAdmin }  // ← respeta el isAdmin del token
     });
   } catch (error) {
     console.error('❌ Error al obtener perfil:', error);

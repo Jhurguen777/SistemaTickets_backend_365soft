@@ -1,19 +1,25 @@
-// src/shared/middleware/auth.ts
 import { Request, Response, NextFunction } from 'express';
 import jwt from 'jsonwebtoken';
 import prisma from '../config/database';
 
+// ✅ Declaración global — hace que Express reconozca el tipo user correcto.
+declare global {
+  namespace Express {
+    interface User {
+      id: string;
+      email: string;
+      tipoRol?: string;
+      isAdmin: boolean;
+    }
+  }
+}
+
 export interface AuthRequest extends Request {
-  user?: {
-    id: string;
-    email: string;
-    tipoRol?: string;
-    isAdmin: boolean;
-  };
+  user?: Express.User;
 }
 
 export const authenticate = async (
-  req: AuthRequest,
+  req: Request,
   res: Response,
   next: NextFunction
 ): Promise<void> => {
@@ -27,7 +33,6 @@ export const authenticate = async (
 
     const decoded = jwt.verify(token, process.env.JWT_SECRET || 'secret') as { id: string };
 
-    // 1️⃣ Buscar en AdminRol (tabla "roles")
     const adminRol = await prisma.adminRol.findUnique({
       where: { id: decoded.id },
       select: { id: true, email: true, tipoRol: true, estado: true }
@@ -50,16 +55,9 @@ export const authenticate = async (
       return;
     }
 
-    // 2️⃣ Buscar en usuarios normales
     const user = await prisma.usuario.findUnique({
       where: { id: decoded.id },
-      select: {
-        id:     true,
-        email:  true,
-        nombre: true,
-        rol:    true,    // enum Rol: USUARIO | ADMIN
-        activo: true
-      }
+      select: { id: true, email: true, nombre: true, rol: true, activo: true }
     });
 
     if (!user) {
@@ -75,7 +73,7 @@ export const authenticate = async (
     req.user = {
       id:      user.id,
       email:   user.email,
-      isAdmin: user.rol === 'ADMIN'  // ← detecta enum Rol.ADMIN en tabla usuarios
+      isAdmin: user.rol === 'ADMIN'
     };
 
     next();
@@ -89,7 +87,7 @@ export const authenticate = async (
 };
 
 export const adminOnly = async (
-  req: AuthRequest,
+  req: Request,
   res: Response,
   next: NextFunction
 ): Promise<void> => {
@@ -106,15 +104,13 @@ export const adminOnly = async (
   next();
 };
 
-// Middleware para verificar roles específicos
 export const hasRole = (...allowedRoles: string[]) => {
-  return async (req: AuthRequest, res: Response, next: NextFunction): Promise<void> => {
+  return async (req: Request, res: Response, next: NextFunction): Promise<void> => {
     if (!req.user || !req.user.isAdmin) {
       res.status(403).json({ error: 'Acceso denegado - Se requiere rol de administrador' });
       return;
     }
 
-    // SUPER_ADMIN tiene acceso a todo
     if (req.user.tipoRol === 'SUPER_ADMIN') {
       next();
       return;

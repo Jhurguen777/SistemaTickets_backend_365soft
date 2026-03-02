@@ -32,9 +32,15 @@ const io = new Server(httpServer, {
 });
 
 // Redis Adapter para escalabilidad horizontal
-if (process.env.REDIS_URL) {
-  io.adapter(createAdapter(redisPub, redisSub));
-  console.log('✅ Socket.IO Redis Adapter configurado');
+if (process.env.REDIS_URL && redisPub.isReady && redisSub.isReady) {
+  try {
+    io.adapter(createAdapter(redisPub, redisSub));
+    console.log('✅ Socket.IO Redis Adapter configurado');
+  } catch (err) {
+    console.warn('⚠️ Redis Adapter no pudo configurarse, usando modo local');
+  }
+} else {
+  console.warn('⚠️ Redis no disponible — Socket.IO en modo local');
 }
 
 // ── MIDDLEWARES ───────────────────────────────────────────────
@@ -44,9 +50,10 @@ app.use(cors({
     process.env.FRONTEND_PROD_URL || ''
   ].filter(Boolean),
   credentials: true,
-  methods: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH'],
+  methods: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH', 'OPTIONS'],
+  allowedHeaders: ['Content-Type', 'Authorization'],
 }));
-
+app.options('*', cors());
 app.use(express.json({ limit: '50mb' }));
 app.use(express.urlencoded({ extended: true, limit: '50mb' }));
 

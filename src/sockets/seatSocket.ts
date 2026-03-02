@@ -10,6 +10,15 @@ interface ReservarAsientoPayload {
 
 const TIEMPO_RESERVA_MS = 10 * 60 * 1000;
 
+// Helper para emitir sin crashear si Redis no está disponible
+const safeEmit = (target: any, event: string, data: any) => {
+  try {
+    target.emit(event, data);
+  } catch (err) {
+    console.warn(`⚠️ Socket emit falló (${event}):`, err);
+  }
+};
+
 export function setupSocketHandlers(io: Server) {
   io.on('connection', (socket: Socket) => {
     console.log(`✅ Cliente conectado: ${socket.id}`);
@@ -24,9 +33,9 @@ export function setupSocketHandlers(io: Server) {
           select: { id: true, fila: true, numero: true, estado: true, reservadoEn: true },
           orderBy: [{ fila: 'asc' }, { numero: 'asc' }],
         });
-        socket.emit('asientos_estado', { asientos });
+        safeEmit(socket, 'asientos_estado', { asientos });
       } catch {
-        socket.emit('error', { message: 'No se pudo obtener el estado de los asientos' });
+        safeEmit(socket, 'error', { message: 'No se pudo obtener el estado de los asientos' });
       }
     });
 
@@ -43,19 +52,19 @@ export function setupSocketHandlers(io: Server) {
         const asiento = await prisma.asiento.findUnique({ where: { id: asientoId } });
 
         if (!asiento) {
-          socket.emit('reserva_fallida', { error: 'Asiento no encontrado' });
+          safeEmit(socket, 'reserva_fallida', { error: 'Asiento no encontrado' });
           return;
         }
 
         if (asiento.estado === 'VENDIDO' || asiento.estado === 'BLOQUEADO') {
-          socket.emit('reserva_fallida', { error: 'El asiento no está disponible' });
+          safeEmit(socket, 'reserva_fallida', { error: 'El asiento no está disponible' });
           return;
         }
 
         if (asiento.estado === 'RESERVANDO' && asiento.reservadoEn) {
           const tiempoTranscurrido = Date.now() - asiento.reservadoEn.getTime();
           if (tiempoTranscurrido < TIEMPO_RESERVA_MS) {
-            socket.emit('reserva_fallida', { error: 'El asiento está siendo reservado por otro usuario' });
+            safeEmit(socket, 'reserva_fallida', { error: 'El asiento está siendo reservado por otro usuario' });
             return;
           }
         }
@@ -79,7 +88,7 @@ export function setupSocketHandlers(io: Server) {
           },
         });
 
-        socket.emit('reserva_exitosa', {
+        safeEmit(socket, 'reserva_exitosa', {
           compraId: compra.id,
           asientoId,
           fila: compra.asiento.fila,
@@ -89,14 +98,16 @@ export function setupSocketHandlers(io: Server) {
           expiraEn: TIEMPO_RESERVA_MS / 1000,
         });
 
-        // Notificar a todos en la sala
-        io.to(`evento_${eventoId}`).emit('asiento_actualizado', {
+        // ✅ FIX: Notificar a todos en la sala con try/catch
+        // Esta línea era la que crasheaba el servidor cuando Redis no estaba disponible
+        safeEmit(io.to(`evento_${eventoId}`), 'asiento_actualizado', {
           asientoId,
           estado: 'RESERVANDO',
         });
 
-      } catch {
-        socket.emit('reserva_fallida', { error: 'Error interno al reservar el asiento' });
+      } catch (err) {
+        console.error('❌ Error en reservar_asiento:', err);
+        safeEmit(socket, 'reserva_fallida', { error: 'Error interno al reservar el asiento' });
       }
     });
 
@@ -105,21 +116,20 @@ export function setupSocketHandlers(io: Server) {
       try {
         const liberados = await sincronizarAsientosExpirados(eventoId);
         if (liberados > 0) {
-          io.to(`evento_${eventoId}`).emit('asiento_actualizado', {
+          safeEmit(io.to(`evento_${eventoId}`), 'asiento_actualizado', {
             tipo: 'expirados',
             cantidad: liberados,
           });
         }
-        socket.emit('asiento:sincronizar-ok', { eventoId, liberados });
+        safeEmit(socket, 'asiento:sincronizar-ok', { eventoId, liberados });
       } catch {
-        socket.emit('error', { mensaje: 'Error al sincronizar asientos.' });
+        safeEmit(socket, 'error', { mensaje: 'Error al sincronizar asientos.' });
       }
     });
 
     // ── DISCONNECT ──────────────────────────────────────────
     socket.on('disconnect', async () => {
       console.log(`❌ Cliente desconectado: ${socket.id}`);
-      // TODO: liberar reservas RESERVANDO del socket desconectado
     });
   });
 }

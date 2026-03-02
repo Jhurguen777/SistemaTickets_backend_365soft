@@ -7,7 +7,6 @@ interface AuthRequest extends Request {
   io?: SocketIOServer;
 }
 
-// Mapa de errores del servicio → código HTTP + mensaje para el frontend
 const errores: Record<string, { status: number; message: string }> = {
   ASIENTO_NO_ENCONTRADO:      { status: 404, message: 'Asiento no encontrado.' },
   ASIENTO_EVENTO_INVALIDO:    { status: 400, message: 'El asiento no pertenece a este evento.' },
@@ -26,16 +25,47 @@ const handleError = (res: Response, err: unknown) => {
   return res.status(500).json({ ok: false, error: 'Error interno del servidor.' });
 };
 
-// GET /api/asientos/evento/:eventoId
-// Llamar al montar el mapa de asientos — estado combina BD + Redis
+// GET /api/asientos/evento/:eventoId — PÚBLICO
 export const getAsientosEvento = async (req: AuthRequest, res: Response): Promise<void> => {
   try {
-    const asientos = await getAsientosPorEvento(req.params.eventoId, req.user?.id);
+    // ✅ Timeout de 8 segundos para evitar cuelgue si Redis no responde
+    const timeoutPromise = new Promise<never>((_, reject) =>
+      setTimeout(() => reject(new Error('TIMEOUT')), 8000)
+    );
+
+    const asientosPromise = getAsientosPorEvento(req.params.eventoId, req.user?.id);
+
+    const asientos = await Promise.race([asientosPromise, timeoutPromise]);
     res.json({ ok: true, total: asientos.length, data: asientos });
-  } catch (err) { handleError(res, err); }
+
+  } catch (err) {
+    const msg = err instanceof Error ? err.message : '';
+
+    if (msg === 'TIMEOUT') {
+      console.warn(`⚠️ Timeout obteniendo asientos del evento ${req.params.eventoId} — Redis puede estar caído`);
+      // ✅ Fallback: devolver asientos desde BD directamente sin Redis
+      try {
+        const { PrismaClient } = await import('@prisma/client');
+        const prisma = new PrismaClient();
+        const asientos = await prisma.asiento.findMany({
+          where: { eventoId: req.params.eventoId },
+          orderBy: [{ fila: 'asc' }, { numero: 'asc' }],
+          select: { id: true, fila: true, numero: true, precio: true, estado: true, eventoId: true }
+        });
+        await prisma.$disconnect();
+        res.json({ ok: true, total: asientos.length, data: asientos });
+      } catch (fallbackErr) {
+        console.error('[Asientos fallback]', fallbackErr);
+        res.status(500).json({ ok: false, error: 'Error al obtener asientos.' });
+      }
+      return;
+    }
+
+    handleError(res, err);
+  }
 };
 
-// GET /api/asientos/:id
+// GET /api/asientos/:id — PÚBLICO
 export const getAsiento = async (req: AuthRequest, res: Response): Promise<void> => {
   try {
     const asiento = await getAsientoById(req.params.id, req.user?.id);
@@ -45,7 +75,6 @@ export const getAsiento = async (req: AuthRequest, res: Response): Promise<void>
 };
 
 // POST /api/asientos/reservar — body: { asientoId, eventoId }
-// Si OK: emite 'asiento:reservado' a todos en la sala del evento
 export const reservar = async (req: AuthRequest, res: Response): Promise<void> => {
   try {
     const { asientoId, eventoId } = req.body;
@@ -67,7 +96,6 @@ export const reservar = async (req: AuthRequest, res: Response): Promise<void> =
 };
 
 // POST /api/asientos/liberar — body: { asientoId, eventoId }
-// Si OK: emite 'asiento:liberado' a todos en la sala del evento
 export const liberar = async (req: AuthRequest, res: Response): Promise<void> => {
   try {
     const { asientoId, eventoId } = req.body;
