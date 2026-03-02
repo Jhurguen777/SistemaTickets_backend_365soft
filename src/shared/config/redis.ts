@@ -7,8 +7,9 @@ dotenv.config();
 export const redisClient = createClient({
   url: process.env.REDIS_URL || 'redis://localhost:6379',
   socket: {
+    connectTimeout: 3000, // ✅ falla en 3s si no puede conectar
     reconnectStrategy: (retries) => {
-      if (retries > 3) return false; // ← deja de intentar después de 3 intentos
+      if (retries > 3) return false; // deja de intentar después de 3 intentos
       return Math.min(retries * 50, 500);
     },
   },
@@ -30,10 +31,10 @@ async function connectRedis() {
 
 connectRedis();
 
-// Un solo log de error, no spam
-redisClient.on('error', () => {}); // silencioso después del intento inicial
+// Silenciar errores post-intento (evita spam en consola)
+redisClient.on('error', () => {});
 redisPub.on('error', () => {});
 redisSub.on('error', () => {});
 
 export default redisClient;
-export {connectRedis };
+export { connectRedis };

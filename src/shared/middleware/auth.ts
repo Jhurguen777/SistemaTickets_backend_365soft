@@ -1,25 +1,30 @@
-// src/shared/middleware/auth.ts
 import { Request, Response, NextFunction } from 'express';
 import jwt from 'jsonwebtoken';
 import prisma from '../config/database';
 
+// ✅ Declaración global — hace que Express reconozca el tipo user correcto.
+declare global {
+  namespace Express {
+    interface User {
+      id: string;
+      email: string;
+      tipoRol?: string;
+      isAdmin: boolean;
+    }
+  }
+}
+
 export interface AuthRequest extends Request {
-  user?: {
-    id: string;
-    email: string;
-    tipoRol?: string;
-    isAdmin: boolean;
-  };
+  user?: Express.User;
 }
 
 export const authenticate = async (
-  req: AuthRequest,
+  req: Request,
   res: Response,
   next: NextFunction
 ): Promise<void> => {
   try {
     const token = req.headers.authorization?.replace('Bearer ', '');
-
     if (!token) {
       res.status(401).json({ error: 'No autorizado - Token no proporcionado' });
       return;
@@ -28,7 +33,7 @@ export const authenticate = async (
     const decoded = jwt.verify(token, process.env.JWT_SECRET || 'secret') as { id: string };
 
     // Primero buscar en la tabla de roles (administradores)
-    const rol = await prisma.adminRol.findUnique({
+    const adminRol = await prisma.adminRol.findUnique({
       where: { id: decoded.id },
       select: { id: true, email: true, tipoRol: true, estado: true }
     });
@@ -38,28 +43,19 @@ export const authenticate = async (
         res.status(403).json({ error: 'Cuenta de administrador inactiva' });
         return;
       }
-
       req.user = {
         id:      adminRol.id,
         email:   adminRol.email,
         tipoRol: adminRol.tipoRol,
         isAdmin: true
       };
-
       next();
       return;
     }
 
-    // 2️⃣ Buscar en usuarios normales
     const user = await prisma.usuario.findUnique({
       where: { id: decoded.id },
-      select: {
-        id:     true,
-        email:  true,
-        nombre: true,
-        rol:    true,    // enum Rol: USUARIO | ADMIN
-        activo: true
-      }
+      select: { id: true, email: true, nombre: true, rol: true, activo: true }
     });
 
     if (!user) {
@@ -75,10 +71,10 @@ export const authenticate = async (
     req.user = {
       id:      user.id,
       email:   user.email,
-      isAdmin: user.rol === 'ADMIN'  // ← detecta enum Rol.ADMIN en tabla usuarios
+      isAdmin: user.rol === 'ADMIN'
     };
-
     next();
+
   } catch (error) {
     if (error instanceof jwt.TokenExpiredError) {
       res.status(401).json({ error: 'Token expirado' });
@@ -89,7 +85,7 @@ export const authenticate = async (
 };
 
 export const adminOnly = async (
-  req: AuthRequest,
+  req: Request,
   res: Response,
   next: NextFunction
 ): Promise<void> => {
@@ -97,34 +93,27 @@ export const adminOnly = async (
     res.status(401).json({ error: 'No autorizado - Debe estar autenticado' });
     return;
   }
-
   if (!req.user.isAdmin) {
     res.status(403).json({ error: 'Acceso denegado - Se requiere rol de administrador' });
     return;
   }
-
   next();
 };
 
-// Middleware para verificar roles específicos
 export const hasRole = (...allowedRoles: string[]) => {
-  return async (req: AuthRequest, res: Response, next: NextFunction): Promise<void> => {
+  return async (req: Request, res: Response, next: NextFunction): Promise<void> => {
     if (!req.user || !req.user.isAdmin) {
       res.status(403).json({ error: 'Acceso denegado - Se requiere rol de administrador' });
       return;
     }
-
-    // SUPER_ADMIN tiene acceso a todo
     if (req.user.tipoRol === 'SUPER_ADMIN') {
       next();
       return;
     }
-
     if (!allowedRoles.includes(req.user.tipoRol || '')) {
       res.status(403).json({ error: 'Acceso denegado - Permisos insuficientes' });
       return;
     }
-
     next();
   };
 };

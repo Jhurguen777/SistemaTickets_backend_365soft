@@ -1,10 +1,13 @@
 // src/modules/auth/auth.routes.ts
-import { Router } from 'express';
+import { Router, RequestHandler } from 'express';
 import passport from './passport.config';
 import { authenticate } from '../../shared/middleware/auth';
 import { googleCallback, completeProfile, getMe, logout, loginLocal, register } from './auth.controller';
 
 const router = Router();
+
+// Cast para compatibilidad de tipos entre AuthRequest y Request de Express
+const auth = authenticate as unknown as RequestHandler;
 
 // Registro local
 router.post('/register', register);
@@ -12,7 +15,7 @@ router.post('/register', register);
 // Login local (solo para desarrollo)
 router.post('/login', loginLocal);
 
-// Paso 1: Redirigir a Google — bypass de Passport para la redirección
+// Paso 1: Redirigir a Google
 router.get('/google', (req, res) => {
   const params = new URLSearchParams({
     client_id: process.env.GOOGLE_CLIENT_ID!,
@@ -33,8 +36,8 @@ router.get('/google/callback',
   googleCallback
 );
 
-router.post('/complete-profile', authenticate, completeProfile);
-router.get('/me', authenticate, getMe);
-router.post('/logout', authenticate, logout);
+router.post('/complete-profile', auth, completeProfile);
+router.get('/me', auth, getMe);
+router.post('/logout', auth, logout);
 
 export default router;
