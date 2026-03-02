@@ -57,6 +57,7 @@ export const getRolById = async (id: string) => {
 
 // Crear un nuevo rol
 export const createRol = async (data: CreateRolDTO) => {
+  // Verificar si el email ya existe
   const existing = await prisma.adminRol.findUnique({
     where: { email: data.email }
   });

@@ -25,7 +25,6 @@ export const authenticate = async (
 ): Promise<void> => {
   try {
     const token = req.headers.authorization?.replace('Bearer ', '');
-
     if (!token) {
       res.status(401).json({ error: 'No autorizado - Token no proporcionado' });
       return;
@@ -33,6 +32,7 @@ export const authenticate = async (
 
     const decoded = jwt.verify(token, process.env.JWT_SECRET || 'secret') as { id: string };
 
+    // Primero buscar en la tabla de roles (administradores)
     const adminRol = await prisma.adminRol.findUnique({
       where: { id: decoded.id },
       select: { id: true, email: true, tipoRol: true, estado: true }
@@ -43,14 +43,12 @@ export const authenticate = async (
         res.status(403).json({ error: 'Cuenta de administrador inactiva' });
         return;
       }
-
       req.user = {
         id:      adminRol.id,
         email:   adminRol.email,
         tipoRol: adminRol.tipoRol,
         isAdmin: true
       };
-
       next();
       return;
     }
@@ -75,8 +73,8 @@ export const authenticate = async (
       email:   user.email,
       isAdmin: user.rol === 'ADMIN'
     };
-
     next();
+
   } catch (error) {
     if (error instanceof jwt.TokenExpiredError) {
       res.status(401).json({ error: 'Token expirado' });
@@ -95,12 +93,10 @@ export const adminOnly = async (
     res.status(401).json({ error: 'No autorizado - Debe estar autenticado' });
     return;
   }
-
   if (!req.user.isAdmin) {
     res.status(403).json({ error: 'Acceso denegado - Se requiere rol de administrador' });
     return;
   }
-
   next();
 };
 
@@ -110,17 +106,14 @@ export const hasRole = (...allowedRoles: string[]) => {
       res.status(403).json({ error: 'Acceso denegado - Se requiere rol de administrador' });
       return;
     }
-
     if (req.user.tipoRol === 'SUPER_ADMIN') {
       next();
       return;
     }
-
     if (!allowedRoles.includes(req.user.tipoRol || '')) {
       res.status(403).json({ error: 'Acceso denegado - Permisos insuficientes' });
       return;
     }
-
     next();
   };
 };

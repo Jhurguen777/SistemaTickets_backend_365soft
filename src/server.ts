@@ -76,7 +76,7 @@ app.get('/health', (_req: Request, res: Response) => {
 // ── API ROUTES ────────────────────────────────────────────────
 app.use('/api/auth', authRoutes);
 app.use('/api/eventos', eventoRoutes);
-app.use('/api/asientos', asientoRoutes);
+app.use('/api/asientos', asientoRoutes(io));
 app.use('/api/compras', compraRoutes);
 app.use('/api/asistencia', asistenciaRoutes);
 app.use('/api/certificados', certificadoRoutes);

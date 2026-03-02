@@ -33,27 +33,30 @@ export const getAsientosPorEvento = async (
       where: { eventoId },
       orderBy: [{ fila: 'asc' }, { numero: 'asc' }],
     }),
-    getLocksSeguro(eventoId),  // ← ya no puede colgar
+    getLocksSeguro(eventoId),
   ]);
 
-  const lockMap = new Map(locks.map((l) => [l.asientoId, l]));
+  const lockMap = new Map(locks.map((l: any) => [l.asientoId, l]));
 
   return asientos.map((a) => {
-    const lock  = lockMap.get(a.id);
+    const lock = lockMap.get(a.id);
     const estado = lock && a.estado === EstadoAsiento.DISPONIBLE ? 'EN_PROCESO' : a.estado;
 
-    return {
+    const result: AsientoConEstadoReal = {
       id:       a.id,
       numero:   a.numero,
       fila:     a.fila,
       precio:   a.precio,
       estado:   estado as EstadoAsiento | 'EN_PROCESO',
       eventoId: a.eventoId,
-      ...(lock && {
-        lockedByMe:  userId ? lock.userId === userId : false,
-        ttlSegundos: lock.ttlSeconds,
-      }),
     };
+
+    if (lock) {
+      result.lockedByMe = userId ? lock.userId === userId : false;
+      result.ttlSegundos = lock.ttlSeconds;
+    }
+
+    return result;
   });
 };
 

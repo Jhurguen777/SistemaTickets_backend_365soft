@@ -25,7 +25,9 @@ const handleError = (res: Response, err: unknown) => {
   return res.status(500).json({ ok: false, error: 'Error interno del servidor.' });
 };
 
-// GET /api/asientos/evento/:eventoId — PÚBLICO
+// GET /api/asientos/evento/:eventoId
+// Llamar al montar el mapa de asientos — estado combina BD + Redis
+// PÚBLICO - no requiere autenticación
 export const getAsientosEvento = async (req: AuthRequest, res: Response): Promise<void> => {
   try {
     // ✅ Timeout de 8 segundos para evitar cuelgue si Redis no responde

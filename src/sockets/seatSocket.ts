@@ -46,7 +46,7 @@ export function setupSocketHandlers(io: Server) {
 
     // ── RESERVAR ASIENTO ────────────────────────────────────
     socket.on('reservar_asiento', async (data: ReservarAsientoPayload) => {
-      const { eventoId, asientoId, userId } = data;
+      const { eventoId, asientoId } = data;
 
       try {
         const asiento = await prisma.asiento.findUnique({ where: { id: asientoId } });
@@ -74,32 +74,16 @@ export function setupSocketHandlers(io: Server) {
           data: { estado: 'RESERVANDO', reservadoEn: new Date() },
         });
 
-        const compra = await prisma.compra.create({
-          data: {
-            usuarioId: userId,
-            eventoId,
-            asientoId,
-            monto: 0,
-            qrCode: `QR-${asientoId}-${userId}-${Date.now()}`,
-          },
-          include: {
-            asiento: { select: { fila: true, numero: true } },
-            evento:  { select: { titulo: true, precio: true } },
-          },
-        });
-
+        // ✅ Ya no creamos compra aquí - eso lo hace el endpoint /api/compras/iniciar-pago
+        // Solo emitimos confirmación al cliente
         safeEmit(socket, 'reserva_exitosa', {
-          compraId: compra.id,
           asientoId,
-          fila: compra.asiento.fila,
-          numero: compra.asiento.numero,
-          evento: compra.evento.titulo,
-          precio: compra.evento.precio,
+          eventoId,
           expiraEn: TIEMPO_RESERVA_MS / 1000,
+          mensaje: 'Asiento reservado. Procede al pago para completar la compra.'
         });
 
-        // ✅ FIX: Notificar a todos en la sala con try/catch
-        // Esta línea era la que crasheaba el servidor cuando Redis no estaba disponible
+        // ✅ Notificar a todos en la sala con safeEmit para evitar crash si Redis no está
         safeEmit(io.to(`evento_${eventoId}`), 'asiento_actualizado', {
           asientoId,
           estado: 'RESERVANDO',
