@@ -68,7 +68,9 @@ class BancoQrUtil {
         { headers }
       );
 
-      if (response.data.codigo !== '0000') {
+      console.log('🏦 Respuesta banco token:', JSON.stringify(response.data));
+
+      if (response.data.codigo !== '0000' && response.data.codigo !== 'OK') {
         throw new Error(`Error generando token: ${response.data.mensaje}`);
       }
 

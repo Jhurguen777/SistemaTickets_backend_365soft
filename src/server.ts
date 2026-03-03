@@ -15,6 +15,8 @@ import compraRoutes from './modules/compras/compras.routes';
 import asistenciaRoutes from './modules/asistencia/asistencia.routes';
 import certificadoRoutes from './modules/certificados/certificados.routes';
 import adminRoutes from './modules/admin/admin.routes';
+import qrPagosRoutes from './modules/compras/qr-pagos.routes';
+
 
 dotenv.config();
 
@@ -78,6 +80,7 @@ app.use('/api/auth', authRoutes);
 app.use('/api/eventos', eventoRoutes);
 app.use('/api/asientos', asientoRoutes(io));
 app.use('/api/compras', compraRoutes);
+app.use('/api/compras/qr', qrPagosRoutes);
 app.use('/api/asistencia', asistenciaRoutes);
 app.use('/api/certificados', certificadoRoutes);
 app.use('/api/admin', adminRoutes);

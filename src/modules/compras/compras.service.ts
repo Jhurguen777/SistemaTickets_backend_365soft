@@ -91,7 +91,9 @@ class ComprasService {
       }
 
       // 4. Calcular monto total (puede haber descuentos futuros)
-      const montoTotal = asiento.evento.precio;
+      console.log('💰 params.monto recibido:', params.monto)
+      console.log('💰 asiento.evento.precio:', asiento.evento.precio)
+      const montoTotal = params.monto ?? asiento.evento.precio;
 
       // 5. Crear compra en estado PENDIENTE
       const compra = await prisma.compra.create({
@@ -110,7 +112,16 @@ class ComprasService {
       // 6. Generar QR del banco (SIMULACIÓN - Próximamente se implementará API real)
       const alias = bancoQrUtil.generarAliasUnico(compra.id);
       const fechaVencimiento = bancoQrUtil.calcularFechaVencimiento(24);
-      const detalleGlosa    = `Ticket Evento: ${asiento.evento.titulo} - Asiento: ${asiento.fila}${asiento.numero}`;
+      let detalleGlosa = `Ticket Evento: ${asiento.evento.titulo} - Asiento: Fila ${asiento.fila}${asiento.numero}`;
+
+      if (params.asientosIds && params.asientosIds.length > 1) {
+        const todosAsientos = await prisma.asiento.findMany({
+          where: { id: { in: params.asientosIds } },
+          select: { fila: true, numero: true }
+        });
+        const listaAsientos = todosAsientos.map(a => `${a.fila}${a.numero}`).join(', ');
+        detalleGlosa = `Ticket Evento: ${asiento.evento.titulo} - Asientos: ${listaAsientos}`;
+      }
 
       let responseBanco: any;
       try {

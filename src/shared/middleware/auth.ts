@@ -33,20 +33,20 @@ export const authenticate = async (
     const decoded = jwt.verify(token, process.env.JWT_SECRET || 'secret') as { id: string };
 
     // Primero buscar en la tabla de roles (administradores)
-    const adminRol = await prisma.adminRol.findUnique({
+    const rol = await prisma.adminRol.findUnique({
       where: { id: decoded.id },
       select: { id: true, email: true, tipoRol: true, estado: true }
     });
 
-    if (adminRol) {
-      if (adminRol.estado !== 'ACTIVO') {
+    if (rol) {
+      if (rol.estado !== 'ACTIVO') {
         res.status(403).json({ error: 'Cuenta de administrador inactiva' });
         return;
       }
       req.user = {
-        id:      adminRol.id,
-        email:   adminRol.email,
-        tipoRol: adminRol.tipoRol,
+        id:      rol.id,
+        email:   rol.email,
+        tipoRol: rol.tipoRol,
         isAdmin: true
       };
       next();

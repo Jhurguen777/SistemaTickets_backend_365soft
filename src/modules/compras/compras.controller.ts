@@ -21,7 +21,7 @@ class ComprasController {
         return;
       }
 
-      const { asientoId, eventoId } = req.body;
+      const { asientoId, eventoId, monto, asientosIds } = req.body;
 
       if (!asientoId || !eventoId) {
         res.status(400).json({
@@ -31,7 +31,7 @@ class ComprasController {
         return;
       }
 
-      const resultado = await comprasService.iniciarPago(usuarioId, { asientoId, eventoId });
+      const resultado = await comprasService.iniciarPago(usuarioId, { asientoId, eventoId, monto, asientosIds });
 
       res.status(201).json(resultado);
     } catch (error: any) {

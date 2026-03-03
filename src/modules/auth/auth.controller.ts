@@ -1,5 +1,6 @@
 // src/modules/auth/auth.controller.ts
 import { Response } from 'express';
+import bcrypt from 'bcrypt';
 import { AuthRequest } from '../../shared/middleware/auth';
 import {
   generateAuthToken,

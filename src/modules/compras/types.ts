@@ -10,6 +10,8 @@
 export interface IniciarPagoRequest {
   asientoId: string;
   eventoId: string;
+  monto?: number;
+  asientosIds?: string[];
   datosAsistente?: DatosAsistente;
 }
 
@@ -240,4 +242,15 @@ export interface CompraConDetalles {
     estado: string;
     imagenQr: string | null;
   };
+}
+export interface GenerarQrParams {
+  compraId: string;
+  monto: number;
+  nombreUsuario: string;
+  nombreEvento: string;
+}
+
+export interface VerificarEstadoResponse {
+  estado: string;
+  pagoProcesado: boolean;
 }
