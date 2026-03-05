@@ -14,11 +14,31 @@ passport.use(
     async (_accessToken, _refreshToken, profile, done) => {
       try {
         const email = profile.emails?.[0]?.value;
-        const nombre = profile.displayName;
         const googleId = profile.id;
 
         if (!email) {
           return done(new Error('No se pudo obtener el email de Google'), undefined);
+        }
+
+        // 🔥 EXTRAER NOMBRE Y APELLIDO DE GOOGLE
+        let nombre = '';
+        let apellido = '';
+
+        // Intentar usar givenName y family_name (más confiable)
+        if (profile.name?.givenName && profile.name?.familyName) {
+          nombre = profile.name.givenName;
+          apellido = profile.name.familyName;
+        }
+        // Fallback a displayName (separar por espacio)
+        else if (profile.displayName) {
+          const partes = profile.displayName.trim().split(/\s+/);
+          if (partes.length >= 2) {
+            nombre = partes[0];
+            apellido = partes.slice(1).join(' ');
+          } else {
+            nombre = profile.displayName;
+            apellido = '';
+          }
         }
 
         let usuario = await prisma.usuario.findFirst({
@@ -36,24 +56,30 @@ passport.use(
           return done(null, {
             id: usuario.id,
             email: usuario.email,
+            nombre: usuario.nombre || undefined,
+            apellido: usuario.apellido || undefined,
             isAdmin: false
           });
         }
 
+        // 🔥 CREAR USUARIO CON NOMBRE Y APELLIDO SEPARADOS
         const nuevoUsuario = await prisma.usuario.create({
           data: {
             email,
             nombre,
+            apellido,
             googleId,
             telefono: '',
             agencia: '',
           }
         });
 
-        console.log(`✅ Nuevo usuario creado: ${email}`);
+        console.log(`✅ Nuevo usuario creado: ${email} - Nombre: ${nombre}, Apellido: ${apellido}`);
         return done(null, {
           id: nuevoUsuario.id,
           email: nuevoUsuario.email,
+          nombre: nuevoUsuario.nombre || undefined,
+          apellido: nuevoUsuario.apellido || undefined,
           isAdmin: false
         });
 
@@ -71,14 +97,32 @@ passport.serializeUser((user: any, done) => {
 
 passport.deserializeUser(async (id: string, done) => {
   try {
-    const usuario = await prisma.usuario.findUnique({ where: { id } });
+    const usuario = await prisma.usuario.findUnique({
+      where: { id },
+      select: {
+        id: true,
+        email: true,
+        nombre: true,
+        apellido: true,
+        rol: true,
+        activo: true,
+        googleId: true,
+        telefono: true,
+        agencia: true,
+        createdAt: true
+      }
+    });
+
     if (!usuario) {
       return done(null, null);
     }
+
     done(null, {
       id: usuario.id,
       email: usuario.email,
-      isAdmin: false
+      nombre: usuario.nombre || undefined,
+      apellido: usuario.apellido || undefined,
+      isAdmin: usuario.rol === 'ADMIN'
     });
   } catch (error) {
     done(error, null);

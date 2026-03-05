@@ -8,6 +8,8 @@ declare global {
     interface User {
       id: string;
       email: string;
+      nombre?: string;
+      apellido?: string;
       tipoRol?: string;
       isAdmin: boolean;
     }
@@ -55,7 +57,7 @@ export const authenticate = async (
 
     const user = await prisma.usuario.findUnique({
       where: { id: decoded.id },
-      select: { id: true, email: true, nombre: true, rol: true, activo: true }
+      select: { id: true, email: true, nombre: true, apellido: true, rol: true, activo: true }
     });
 
     if (!user) {
@@ -69,9 +71,11 @@ export const authenticate = async (
     }
 
     req.user = {
-      id:      user.id,
-      email:   user.email,
-      isAdmin: user.rol === 'ADMIN'
+      id:       user.id,
+      email:    user.email,
+      nombre:   user.nombre || undefined,
+      apellido: user.apellido || undefined,
+      isAdmin:  user.rol === 'ADMIN'
     };
     next();
 

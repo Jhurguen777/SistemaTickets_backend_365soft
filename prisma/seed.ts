@@ -13,7 +13,7 @@ async function main() {
   await prisma.compra.deleteMany();
   await prisma.asiento.deleteMany();
   await prisma.evento.deleteMany();
-  await prisma.rol.deleteMany();
+  await prisma.adminRol.deleteMany();
   await prisma.usuario.deleteMany();
 
   // ============================================
@@ -23,7 +23,7 @@ async function main() {
 
   const hashedPassword = await bcrypt.hash('superadmin', 10);
 
-  const superAdmin = await prisma.rol.create({
+  const superAdmin = await prisma.adminRol.create({
     data: {
       nombre: 'Administrador Principal',
       email: 'administrador@gmail.com',
@@ -241,7 +241,7 @@ async function main() {
   console.log('═══════════════════════════════════════');
 
   const stats = {
-    roles: await prisma.rol.count(),
+    roles: await prisma.adminRol.count(),
     usuarios: await prisma.usuario.count(),
     eventos: await prisma.evento.count(),
     asientos: await prisma.asiento.count(),
