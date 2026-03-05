@@ -9,6 +9,7 @@ import {
   exportToCSV,
   getUsersList,
   getUserPurchases,
+  getEventUsers,
 } from './admin.service';
 
 // ── DASHBOARD KPIs ─────────────────────────────────────────────
@@ -180,5 +181,32 @@ export const getUserPurchasesHandler = async (req: AuthRequest, res: Response): 
   } catch (error) {
     console.error('❌ Error al obtener compras del usuario:', error);
     res.status(500).json({ error: 'Error al obtener compras del usuario' });
+  }
+};
+
+// ── OBTENER USUARIOS POR EVENTO ────────────────────────────────────────
+export const getEventUsersHandler = async (req: AuthRequest, res: Response): Promise<void> => {
+  try {
+    if (!req.user || !req.user.isAdmin) {
+      res.status(403).json({ error: 'Acceso denegado' });
+      return;
+    }
+
+    const { eventId } = req.params;
+
+    if (!eventId) {
+      res.status(400).json({ error: 'ID de evento es requerido' });
+      return;
+    }
+
+    const usuarios = await getEventUsers(eventId);
+
+    res.json({
+      success: true,
+      data: usuarios
+    });
+  } catch (error) {
+    console.error('❌ Error al obtener usuarios del evento:', error);
+    res.status(500).json({ error: 'Error al obtener usuarios del evento' });
   }
 };

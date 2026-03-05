@@ -399,3 +399,89 @@ export const getUserPurchases = async (userId: string) => {
     fechaCompra: compra.createdAt
   }));
 };
+
+// ── OBTENER USUARIOS POR EVENTO ────────────────────────────────────────
+export const getEventUsers = async (eventId: string) => {
+  // Obtener todas las compras PAGADAS para este evento
+  const compras = await prisma.compra.findMany({
+    where: {
+      eventoId: eventId,
+      estadoPago: 'PAGADO'
+    },
+    include: {
+      usuario: {
+        select: {
+          id: true,
+          email: true,
+          nombre: true,
+          apellido: true,
+          ci: true,
+          telefono: true,
+          agencia: true,
+          createdAt: true
+        }
+      },
+      asiento: {
+        select: {
+          fila: true,
+          numero: true
+        }
+      },
+      evento: {
+        select: {
+          id: true,
+          titulo: true
+        }
+      }
+    },
+    orderBy: { createdAt: 'desc' }
+  });
+
+  // Agrupar por usuario para no duplicar usuarios con múltiples compras
+  const usuariosMap = new Map<string, {
+    id: string;
+    eventId: string;
+    eventTitle: string;
+    nombre: string;
+    email: string;
+    telefono: string;
+    sector: string;
+    cantidad: number;
+    totalPagado: number;
+    fechaCompra: Date;
+    estadoPago: string;
+    asientos: string[];
+  }>();
+
+  compras.forEach(compra => {
+    const usuario = compra.usuario;
+    const usuarioId = usuario.id;
+    const asientoStr = `${compra.asiento.fila}${compra.asiento.numero}`;
+
+    if (!usuariosMap.has(usuarioId)) {
+      usuariosMap.set(usuarioId, {
+        id: usuario.id,
+        eventId: compra.evento.id,
+        eventTitle: compra.evento.titulo,
+        nombre: `${usuario.nombre}${usuario.apellido ? ' ' + usuario.apellido : ''}`,
+        email: usuario.email,
+        telefono: usuario.telefono || 'No registrado',
+        sector: usuario.agencia || 'General', // Usar agencia como sector
+        cantidad: 1,
+        totalPagado: compra.monto,
+        estadoPago: compra.estadoPago,
+        fechaCompra: compra.createdAt,
+        asientos: [asientoStr]
+      });
+    } else {
+      // Sumar cantidad y monto si el usuario tiene múltiples compras
+      const usuarioExistente = usuariosMap.get(usuarioId)!;
+      usuarioExistente.cantidad += 1;
+      usuarioExistente.totalPagado += compra.monto;
+      usuarioExistente.asientos.push(asientoStr);
+    }
+  });
+
+  // Convertir el Map a un array
+  return Array.from(usuariosMap.values());
+};

@@ -9,6 +9,7 @@ import {
   exportData,
   getUsers,
   getUserPurchasesHandler,
+  getEventUsersHandler,
 } from './admin.controller';
 import rolesRoutes from './roles.routes';
 
@@ -28,6 +29,9 @@ router.get('/export', authenticate, adminOnly, exportData);
 // Usuarios
 router.get('/users', authenticate, adminOnly, getUsers);
 router.get('/users/:userId/purchases', authenticate, adminOnly, getUserPurchasesHandler);
+
+// Eventos
+router.get('/events/:eventId/users', authenticate, adminOnly, getEventUsersHandler);
 
 // Roles (Administradores)
 router.use('/roles', rolesRoutes);
