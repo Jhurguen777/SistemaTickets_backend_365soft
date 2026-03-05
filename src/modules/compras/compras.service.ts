@@ -493,15 +493,16 @@ class ComprasService {
         });
 
         // 4. Actualizar TODAS las compras PENDIENTES a PAGADO
+        // ✅ Nota: No actualizamos qrPagoId/qrPagoAlias porque hay una restricción única en la BD
+        // La primera compra ya debería tener estos campos desde la creación
         await tx.compra.updateMany({
           where: {
             id: { in: comprasPendientes.map(c => c.id) }
           },
           data: {
             estadoPago: 'PAGADO' as any,
-            metodoPago: 'QR BANCO',
-            qrPagoId: qrPagoId, // Vincular todas las compras al QR
-            qrPagoAlias: qrPago.alias
+            metodoPago: 'QR BANCO'
+            // qrPagoId y qrPagoAlias NO se actualizan aquí por restricción única
           }
         });
 

@@ -47,6 +47,8 @@ export const getAsientosPorEvento = async (
     getLocksSeguro(eventoId),
   ]);
 
+  console.log('📋 Asientos obtenidos para evento', eventoId, ':', asientos.map(a => ({ id: a.id, fila: a.fila, numero: a.numero, estado: a.estado })));
+
   const lockMap = new Map(locks.map((l: any) => [l.asientoId, l]));
 
   return asientos.map((a) => {
@@ -235,7 +237,10 @@ export const reservarVarios = async ({
     }
   });
 
+  console.log('🔍 Asientos encontrados en BD:', asientos.length, 'de', asientosIds.length, 'solicitados');
+
   if (asientos.length !== asientosIds.length) {
+    console.log('❌ IDs no encontrados:', asientosIds.filter(id => !asientos.find(a => a.id === id)));
     throw new Error('ALGUNOS_ASIENTOS_NO_EXISTEN');
   }
 

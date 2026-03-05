@@ -135,6 +135,9 @@ export const reservarVarios = async (req: AuthRequest, res: Response): Promise<v
     const { asientosIds, eventoId } = req.body;
     const userId = req.user?.id;
 
+    // 📝 Debug log
+    console.log('🎯 reservarVarios - Request:', { asientosIds, eventoId, userId });
+
     if (!asientosIds || !Array.isArray(asientosIds) || asientosIds.length === 0) {
       res.status(400).json({ ok: false, error: 'asientosIds es requerido y debe ser un array.' });
       return;

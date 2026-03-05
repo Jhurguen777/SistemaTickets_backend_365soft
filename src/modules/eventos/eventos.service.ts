@@ -173,7 +173,7 @@ export const getEventoById = async (id: string) => {
 
 // ── CREAR EVENTO ───────────────────────────────────────────────────────
 export const createEvento = async (data: CreateEventoData) => {
-  return prisma.evento.create({
+  const evento = await prisma.evento.create({
     data: {
       titulo: data.titulo,
       descripcion: data.descripcion,
@@ -212,6 +212,79 @@ export const createEvento = async (data: CreateEventoData) => {
       }
     }
   });
+
+  // ✅ Crear asientos si se proporciona seatMapConfig
+  if (data.seatMapConfig) {
+    const config = data.seatMapConfig;
+    const rows: any[] = config.rows || [];
+
+    if (rows.length > 0) {
+      const sectoresBD = await prisma.sectorEvento.findMany({
+        where: { eventoId: evento.id },
+        select: { id: true, nombre: true, precio: true }
+      });
+
+      const sectorPrecioMap = new Map<string, number>();
+      for (const configSector of config.sectors || []) {
+        const sectorBD = sectoresBD.find(
+          s => s.nombre.trim().toLowerCase() === configSector.name.trim().toLowerCase()
+        );
+        if (sectorBD) {
+          sectorPrecioMap.set(configSector.id, sectorBD.precio);
+        }
+      }
+
+      const asientosACrear: Array<{
+        fila:     string;
+        numero:   number;
+        precio:   number;
+        estado:   'DISPONIBLE' | 'RESERVANDO' | 'VENDIDO' | 'BLOQUEADO';
+        eventoId: string;
+      }> = [];
+
+      const sortedRows = [...rows].sort((a: any, b: any) => (a.order ?? 0) - (b.order ?? 0));
+
+      for (const row of sortedRows) {
+        const totalSeats: number = typeof row.seats === 'number' ? row.seats : 0;
+        const sectorPrecioFila = sectorPrecioMap.get(row.sectorId);
+
+        for (let i = 0; i < totalSeats; i++) {
+          const specialSeat = config.specialSeats?.find(
+            (s: any) => s.rowId === row.id && s.seatIndex === i
+          );
+
+          let estado: 'DISPONIBLE' | 'RESERVANDO' | 'VENDIDO' | 'BLOQUEADO' = 'DISPONIBLE';
+          if (specialSeat?.status === 'sold')          estado = 'VENDIDO';
+          else if (specialSeat?.status === 'reserved') estado = 'RESERVANDO';
+          else if (specialSeat?.status === 'blocked')  estado = 'BLOQUEADO';
+
+          const precio = resolverPrecio(
+            specialSeat?.price,
+            sectorPrecioFila,
+            data.precio
+          );
+
+          asientosACrear.push({
+            fila:     row.name,
+            numero:   i + 1,
+            precio,
+            estado,
+            eventoId: evento.id
+          });
+        }
+      }
+
+      if (asientosACrear.length > 0) {
+        await prisma.asiento.createMany({
+          data: asientosACrear,
+          skipDuplicates: true
+        });
+        console.log(`✅ ${asientosACrear.length} asientos creados para el evento ${evento.id}`);
+      }
+    }
+  }
+
+  return evento;
 };
 
 // ── HELPER: precio efectivo de un asiento ────────────────────────────
@@ -227,6 +300,13 @@ const resolverPrecio = (
 
 // ── ACTUALIZAR EVENTO ─────────────────────────────────────────────────
 export const updateEvento = async (id: string, data: UpdateEventoData) => {
+  console.log('🔧 updateEvento service - Recibiendo:', {
+    id,
+    tieneSeatMapConfig: !!data.seatMapConfig,
+    tieneSectores: !!data.sectores,
+    sectoresLength: data.sectores?.length || 0
+  });
+
   const existe = await prisma.evento.findUnique({
     where: { id },
     select: { precio: true }
@@ -286,13 +366,17 @@ export const updateEvento = async (id: string, data: UpdateEventoData) => {
     const config = data.seatMapConfig as any;
     const rows: any[] = config.rows || [];
 
+    console.log('🔧 updateEvento - seatMapConfig recibido:', { rows: rows.length, sectors: config.sectors?.length, specialSeats: config.specialSeats?.length });
+
     if (rows.length > 0) {
       await prisma.asiento.deleteMany({ where: { eventoId: id } });
+      console.log(`🗑️ Asientos eliminados del evento ${id}`);
 
       const sectoresBD = await prisma.sectorEvento.findMany({
         where: { eventoId: id },
         select: { id: true, nombre: true, precio: true }
       });
+      console.log('📋 Sectores en BD:', sectoresBD);
 
       const sectorPrecioMap = new Map<string, number>();
       for (const configSector of config.sectors || []) {
@@ -315,10 +399,12 @@ export const updateEvento = async (id: string, data: UpdateEventoData) => {
       }> = [];
 
       const sortedRows = [...rows].sort((a: any, b: any) => (a.order ?? 0) - (b.order ?? 0));
+      console.log('📊 Filas ordenadas (updateEvento):', sortedRows.map(r => ({ id: r.id, name: r.name, seats: r.seats, sectorId: r.sectorId })));
 
       for (const row of sortedRows) {
         const totalSeats: number = typeof row.seats === 'number' ? row.seats : 0;
         const sectorPrecioFila = sectorPrecioMap.get(row.sectorId);
+        console.log(`🪑 Procesando fila (updateEvento): ${row.name} (${row.id}), ${totalSeats} asientos, sector: ${row.sectorId}`);
 
         for (let i = 0; i < totalSeats; i++) {
           const specialSeat = config.specialSeats?.find(
@@ -346,16 +432,24 @@ export const updateEvento = async (id: string, data: UpdateEventoData) => {
         }
       }
 
+      console.log(`🪑 Asientos a crear: ${asientosACrear.length}`);
+      console.log('🪑 Primer asiento a crear:', asientosACrear[0]);
+      console.log('🪑 Último asiento a crear:', asientosACrear[asientosACrear.length - 1]);
+
       if (asientosACrear.length > 0) {
-        await prisma.asiento.createMany({
+        const resultado = await prisma.asiento.createMany({
           data: asientosACrear,
           skipDuplicates: true
         });
-        console.log(`✅ ${asientosACrear.length} asientos creados para el evento ${id}`);
+        console.log(`✅ ${resultado.count} asientos creados para el evento ${id}`);
       } else {
         console.warn(`⚠️  seatMapConfig recibido pero no se generaron asientos. Revisar rows/seats.`);
       }
+    } else {
+      console.warn('⚠️ No hay filas en seatMapConfig');
     }
+  } else {
+    console.log('ℹ️ No se envió seatMapConfig en la actualización');
   }
 
   return evento;

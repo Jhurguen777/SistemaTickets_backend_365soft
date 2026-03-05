@@ -7,6 +7,7 @@ import {
   VerificarEstadoResponse,
   QrInfo,
 } from './types';
+import comprasService from './compras.service';
 
 class QrPagosService {
 
@@ -122,10 +123,12 @@ class QrPagosService {
       data: { estado: estadoActual as any },
     });
 
-    // Si recién se pagó, procesar la compra
-    if (estadoActual === 'PAGADO' && estadoAnterior !== 'PAGADO') {
-      await this.procesarPago(qrPago.id, qrPago.compraId!);
-      return { estado: estadoActual, pagoProcesado: true };
+    // Si recién se pagó, procesar TODAS las compras pendientes del mismo usuario/evento
+    if (estadoActual === 'PAGADO') {
+      console.log('💰 Pago detectado, procesando todas las compras pendientes del usuario/evento con comprasService.procesarPagoQr()');
+      // ✅ Usar comprasService.procesarPagoQr para procesar TODAS las compras pendientes del mismo usuario/evento
+      await comprasService.procesarPagoQr(qrPago.id);
+      return { estado: estadoActual, pagoProcesado: estadoAnterior !== 'PAGADO' };
     }
 
     return { estado: estadoActual, pagoProcesado: false };
@@ -191,10 +194,9 @@ class QrPagosService {
       },
     });
 
-    // Procesar compra y asiento
-    if (qrPago.compraId) {
-      await this.procesarPago(qrPago.id, qrPago.compraId);
-    }
+    // ✅ Procesar TODAS las compras pendientes del mismo usuario/evento usando comprasService.procesarPagoQr()
+    console.log('💰 Webhook recibido, procesando todas las compras pendientes del usuario/evento con comprasService.procesarPagoQr()');
+    await comprasService.procesarPagoQr(qrPago.id);
 
     return { codigo: '0000', mensaje: 'Registro Exitoso' };
   }

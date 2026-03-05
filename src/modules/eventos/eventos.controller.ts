@@ -93,6 +93,14 @@ export const updateEventoController = async (req: AuthRequest, res: Response): P
     const { id } = req.params;
     const eventoData = req.body;
 
+    // 📝 Debug log
+    console.log('🔧 updateEventoController - Request body:', {
+      id,
+      tieneSeatMapConfig: !!eventoData.seatMapConfig,
+      seatMapConfigKeys: eventoData.seatMapConfig ? Object.keys(eventoData.seatMapConfig) : [],
+      sectoresLength: eventoData.sectores?.length || 0
+    });
+
     const evento = await updateEvento(id, eventoData);
 
     if (!evento) {
