@@ -41,15 +41,33 @@ cp .env.example .env
 ## 🗄️ Configurar Base de Datos
 
 ```bash
-# Generar Prisma Client
-npm run prisma:generate
-
 # Ejecutar migraciones
-npm run prisma:migrate
+npm run db:migrate
+
+# Seed de base de datos (datos de prueba)
+npm run db:seed
 
 # (Opcional) Abrir Prisma Studio
 npm run prisma:studio
 ```
+
+### 🔑 Credenciales de Prueba (Después del Seed)
+
+El seed crea automáticamente un administrador principal:
+
+```
+Email: administrador@gmail.com
+Password: superadmin
+Rol: SUPER_ADMIN
+```
+
+### 👥 Usuarios de Prueba Creados
+
+El seed también crea 4 usuarios de prueba:
+- juan.perez@gmail.com
+- maria.garcia@gmail.com
+- carlos.rodriguez@gmail.com
+- admin@inmobiliaria.com
 
 ## 🎯 Modos de Ejecución
 
@@ -69,6 +87,28 @@ npm run build
 
 # Start
 npm start
+```
+
+## 📁 Scripts Disponibles
+
+```bash
+# Desarrollo
+npm run dev              # Inicia servidor en modo desarrollo
+
+# Base de Datos
+npm run db:migrate       # Ejecuta migraciones de Prisma
+npm run db:seed         # Ejecuta seed con datos de prueba
+npm run db:push         # Sincroniza schema sin migración
+npm run db:studio        # Abre Prisma Studio GUI
+npm run prisma:generate  # Regenera Prisma Client
+npm run prisma:format   # Formatea schema.prisma
+
+# Producción
+npm run build            # Compila TypeScript
+npm start              # Inicia servidor en modo producción
+
+# Monitoreo
+npm run lint            # Ejecuta ESLint
 ```
 
 ## 📁 Estructura del Proyecto

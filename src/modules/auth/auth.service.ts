@@ -18,11 +18,15 @@ export interface CompleteProfileData {
 export const generateAuthToken = (usuario: {
   id: string;
   email: string;
+  nombre?: string;
+  apellido?: string;
   rol?: string;
 }) => {
   const token = generateToken({
     id: usuario.id,
     email: usuario.email,
+    ...(usuario.nombre && { nombre: usuario.nombre }),
+    ...(usuario.apellido && { apellido: usuario.apellido }),
     ...(usuario.rol && { rol: usuario.rol }),
   });
 

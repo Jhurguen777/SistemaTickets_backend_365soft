@@ -11,7 +11,7 @@ import {
 } from './auth.service';
 import prisma from '../../shared/config/database';
 
-// ── REGISTRO LOCAL ────────────────────────────────────────────
+// ── REGISTRO LOCAL ────────────────────────────────────
 export const register = async (req: AuthRequest, res: Response): Promise<void> => {
   try {
     const { email, password, nombre, apellido } = req.body;
@@ -84,7 +84,7 @@ export const loginLocal = async (req: AuthRequest, res: Response): Promise<void>
       });
 
       const token = generateAuthToken({
-        id:    adminUser.id,
+        id: adminUser.id,
         email: adminUser.email,
         rol:   adminUser.tipoRol
       });
@@ -96,7 +96,7 @@ export const loginLocal = async (req: AuthRequest, res: Response): Promise<void>
         usuario: {
           id:      adminUser.id,
           email:   adminUser.email,
-          nombre:  adminUser.nombre,
+          nombre: adminUser.nombre,
           tipoRol: adminUser.tipoRol,
           isAdmin: true
         }
@@ -169,9 +169,12 @@ export const googleCallback = async (req: AuthRequest, res: Response): Promise<v
       return;
     }
 
+    // 🔥 INCLUIR NOMBRE Y APELLIDO EN EL TOKEN JWT
     const token = generateAuthToken({
-      id:    usuario.id,
+      id: usuario.id,
       email: usuario.email,
+      nombre: usuario.nombre,
+      apellido: usuario.apellido,
     });
 
     const needsCompletion = await needsProfileCompletion(usuario.id);
@@ -197,10 +200,11 @@ export const completeProfile = async (req: AuthRequest, res: Response): Promise<
 
     const { nombre, apellido, ci, telefono, agencia } = req.body;
 
-    if (!nombre || !apellido || !ci || !telefono || !agencia) {
+    // 🔥 NOMBRE Y APELLIDO SON OPCIONALES (solo CI y teléfono son obligatorios)
+    if (!ci || !telefono || !agencia) {
       res.status(400).json({
         error: 'Datos incompletos',
-        message: 'Nombre, apellido, CI, teléfono y agencia son obligatorios'
+        message: 'CI, teléfono y agencia son obligatorios'
       });
       return;
     }
@@ -208,13 +212,13 @@ export const completeProfile = async (req: AuthRequest, res: Response): Promise<
     const usuarioActualizado = await completeUserProfile(req.user.id, { nombre, apellido, ci, telefono, agencia });
 
     const token = generateAuthToken({
-      id:    usuarioActualizado.id,
+      id: usuarioActualizado.id,
       email: usuarioActualizado.email,
     });
 
     res.json({
       success: true,
-      message: 'Perfil completado exitosamente',
+      message: 'Perfil actualizado exitosamente',
       token,
       usuario: {
         id:       usuarioActualizado.id,
@@ -232,7 +236,7 @@ export const completeProfile = async (req: AuthRequest, res: Response): Promise<
   }
 };
 
-// ── GET ME ───────────────────────────────────────────────────
+// ── GET ME ───────────────────────────────────────────
 export const getMe = async (req: AuthRequest, res: Response): Promise<void> => {
   try {
     if (!req.user) {
