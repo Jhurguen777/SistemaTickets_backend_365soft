@@ -49,6 +49,8 @@ model AdminRol {
   createdAt    DateTime  @default(now())
   updatedAt    DateTime  @updatedAt
 
+  plantillas   PlantillaCertificado[]
+
   @@map("roles")
 }
 
@@ -183,11 +185,70 @@ model Compra {
   asiento         Asiento     @relation(fields: [asientoId], references: [id], onDelete: Cascade)
   qrPago          QrPagos?    @relation(fields: [qrPagoId], references: [id])
   asistencia      Asistencia?
+  certificado     Certificado?
 
   @@index([usuarioId])
   @@index([eventoId])
   @@index([estadoPago])
   @@map("compras")
+}
+
+// ============================================
+// CERTIFICADOS
+// ============================================
+
+model PlantillaCertificado {
+  id                   String                 @id @default(uuid())
+  nombre                String
+  tipo                 TipoCertificado        @default(PERSONALIZADO)
+  descripcion           String?
+  contenido             String                 @db.Text  // HTML de TipTap con {{nombre}}, {{evento}}, etc.
+  activo                Boolean                @default(true)
+  creadorId             String?
+  creador               AdminRol?              @relation(fields: [creadorId], references: [id])
+  createdAt             DateTime               @default(now())
+  updatedAt             DateTime               @updatedAt
+
+  certificados          Certificado[]
+  historialEnvios       HistorialEnvioCertificado[]
+
+  @@map("plantillas_certificado")
+}
+
+model Certificado {
+  id                  String             @id @default(uuid())
+  compraId            String?             @unique  // OPCIONAL - one-to-one con Compra
+  usuarioId           String?                      // OPCIONAL (asistente sin usuario)
+  plantillaId         String
+  nombreDestinatario  String?                     // Nombre del destinatario
+  emailDestinatario   String?                     // Email del destinatario
+  codigo              String             @unique  // Código único de verificación
+  urlArchivo          String?                      // URL del PDF generado
+  fechaEmision        DateTime           @default(now())
+  enviado             Boolean            @default(false)
+  fechaEnvio          DateTime?
+
+  compra              Compra?             @relation(fields: [compraId], references: [id], onDelete: Cascade)
+  plantilla           PlantillaCertificado @relation(fields: [plantillaId], references: [id])
+
+  @@index([usuarioId])
+  @@index([plantillaId])
+  @@map("certificados")
+}
+
+model HistorialEnvioCertificado {
+  id              String    @id @default(uuid())
+  plantillaId     String
+  eventoId        String
+  usuarioId       String?   // Quién envió (admin)
+  cantidadEnviada Int       @default(0)
+  cantidadError   Int       @default(0)
+  error           String?
+  fechaEnvio      DateTime  @default(now())
+
+  plantilla       PlantillaCertificado @relation(fields: [plantillaId], references: [id])
+
+  @@map("historial_envios_certificados")
 }
 
 // ============================================
@@ -285,4 +346,11 @@ enum EstadoReembolso {
   APROBADO
   RECHAZADO
   PROCESADO
+}
+
+enum TipoCertificado {
+  PERSONALIZADO
+  ASISTENCIA_ESTANDAR
+  FINALIZACION
+  EXCELENCIA
 }
