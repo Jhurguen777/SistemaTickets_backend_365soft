@@ -1,8 +1,8 @@
 // src/modules/compras/qr-pagos.controller.ts
-
 import { Request, Response } from 'express';
 import prisma from '../../shared/config/database';
 import qrPagosService from './qr-pagos.service';
+import comprasService from './compras.service';
 
 /**
  * POST /api/compras/qr/generar
@@ -18,7 +18,7 @@ export async function generarQr(req: Request, res: Response): Promise<void> {
       return;
     }
 
-    // Verificar que la compra pertenece al usuario autenticado
+    // Verificar que la compra pertenezca al usuario autenticado
     const compra = await prisma.compra.findFirst({
       where: { id: compraId, usuarioId },
       include: {
@@ -59,13 +59,29 @@ export async function generarQr(req: Request, res: Response): Promise<void> {
 
 /**
  * GET /api/compras/qr/estado/:qrPagoId
+ * GET /api/compras/qr/verificar?id={qrPagoId}
  * Polling desde el frontend para verificar si ya fue pagado
  */
 export async function verificarEstado(req: Request, res: Response): Promise<void> {
   try {
-    const { qrPagoId } = req.params;
+    console.log('🎯 verificarEstado controller INICIADO');
 
-    const resultado = await qrPagosService.verificarEstado(qrPagoId);
+    // Aceptar ambos: parámetro de ruta y query parameter
+    const qrIdFromParam = (req.params as any).qrPagoId;
+    const qrIdFromQuery = req.query.id as string;
+    const finalQrId = qrIdFromQuery || qrIdFromParam;
+
+    if (!finalQrId) {
+      console.warn('[QR] verificarEstado sin QR ID:', {
+        params: req.params,
+        query: req.query
+      });
+      res.status(400).json({ success: false, message: 'QR ID es requerido' });
+      return;
+    }
+
+    console.log('[QR] Verificando estado:', { qrId: finalQrId });
+    const resultado = await qrPagosService.verificarEstado(finalQrId);
 
     res.status(200).json({
       success: true,
@@ -82,11 +98,11 @@ export async function verificarEstado(req: Request, res: Response): Promise<void
 }
 
 /**
- * POST /api/compras/qr/callback
- * ⚠️ Ruta PÚBLICA - el banco MC4 llama aquí automáticamente cuando alguien paga
+ * POST /api/compras/webhook/banco
+ * ⚠️ RUTA PÚBLICA - el banco MC4 llama aquí automáticamente cuando alguien paga
  * NO agregar middleware de autenticación JWT a esta ruta
  */
-export async function handleCallback(req: Request, res: Response): Promise<void> {
+export async function handleWebhook(req: Request, res: Response): Promise<void> {
   try {
     const payload = req.body;
 
@@ -95,13 +111,12 @@ export async function handleCallback(req: Request, res: Response): Promise<void>
       return;
     }
 
-    console.log('📬 Callback recibido del banco:', payload.alias);
+    console.log('📬 Webhook recibido del banco:', payload);
 
-    const resultado = await qrPagosService.procesarWebhook(payload);
-
+    const resultado = await comprasService.manejarWebhook(payload);
     res.status(200).json(resultado);
   } catch (error: any) {
-    console.error('[QR] Error en callback:', error.message);
+    console.error('[QR] Error en webhook:', error.message);
     // Siempre responder 200 al banco aunque haya error interno
     res.status(200).json({ codigo: '1212', mensaje: 'Error interno' });
   }
@@ -109,11 +124,17 @@ export async function handleCallback(req: Request, res: Response): Promise<void>
 
 /**
  * DELETE /api/compras/qr/:qrPagoId
- * Cancela un QR pendiente
+ * Cancelar un QR pendiente
  */
 export async function cancelarQr(req: Request, res: Response): Promise<void> {
   try {
     const { qrPagoId } = req.params;
+    const usuarioId = (req as any).user?.id;
+
+    if (!usuarioId) {
+      res.status(401).json({ success: false, message: 'No autenticado' });
+      return;
+    }
 
     await qrPagosService.cancelarQr(qrPagoId);
 
