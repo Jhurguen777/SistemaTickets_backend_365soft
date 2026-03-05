@@ -25,6 +25,16 @@ export const authenticate = async (
 ): Promise<void> => {
   try {
     const token = req.headers.authorization?.replace('Bearer ', '');
+
+    // Log para depuración de peticiones
+    if (req.path.includes('/qr/verificar') || req.path.includes('/verificar-pago')) {
+      console.log('🔐 Middleware authenticate:', {
+        method: req.method,
+        path: req.path,
+        query: req.query,
+        hasToken: !!token
+      });
+    }
     if (!token) {
       res.status(401).json({ error: 'No autorizado - Token no proporcionado' });
       return;
@@ -49,6 +59,7 @@ export const authenticate = async (
         tipoRol: rol.tipoRol,
         isAdmin: true
       };
+      console.log('✅ Usuario administrador autenticado:', { id: rol.id, email: rol.email });
       next();
       return;
     }
@@ -59,11 +70,13 @@ export const authenticate = async (
     });
 
     if (!user) {
+      console.error('❌ Usuario no encontrado en BD:', decoded.id);
       res.status(401).json({ error: 'Usuario no encontrado' });
       return;
     }
 
     if (!user.activo) {
+      console.error('❌ Cuenta inactiva:', { id: user.id, email: user.email });
       res.status(403).json({ error: 'Cuenta inactiva' });
       return;
     }
@@ -73,9 +86,16 @@ export const authenticate = async (
       email:   user.email,
       isAdmin: user.rol === 'ADMIN'
     };
+    console.log('✅ Usuario autenticado:', { id: user.id, email: user.email, isAdmin: user.rol === 'ADMIN' });
     next();
 
-  } catch (error) {
+  } catch (error: any) {
+    console.error('❌ Error en middleware authenticate:', {
+      error: error.message,
+      errorType: error.constructor.name,
+      stack: error.stack
+    });
+
     if (error instanceof jwt.TokenExpiredError) {
       res.status(401).json({ error: 'Token expirado' });
       return;

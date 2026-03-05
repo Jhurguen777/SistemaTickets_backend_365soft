@@ -5,7 +5,7 @@ import { authenticate } from '../../shared/middleware/auth';
 import {
   generarQr,
   verificarEstado,
-  handleCallback,
+  handleWebhook,
   cancelarQr,
 } from './qr-pagos.controller';
 
@@ -22,6 +22,10 @@ router.post('/generar', authenticate, generarQr);
 // GET /api/compras/qr/estado/:qrPagoId
 router.get('/estado/:qrPagoId', authenticate, verificarEstado);
 
+// Verificar estado del QR con query parameter (para compatibilidad con frontend)
+// GET /api/compras/qr/verificar?id={qrPagoId}
+router.get('/verificar', authenticate, verificarEstado);
+
 // Cancelar QR pendiente
 // DELETE /api/compras/qr/:qrPagoId
 router.delete('/:qrPagoId', authenticate, cancelarQr);
@@ -30,6 +34,6 @@ router.delete('/:qrPagoId', authenticate, cancelarQr);
 
 // ⚠️ Sin JWT - el banco llama aquí automáticamente cuando alguien paga
 // POST /api/compras/qr/callback
-router.post('/callback', handleCallback);
+router.post('/callback', handleWebhook);
 
 export default router;

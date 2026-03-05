@@ -39,7 +39,7 @@ export interface VerificarPagoRequest {
 export interface IniciarPagoResponse {
   success: boolean;
   message: string;
-  compra?: CompraCreada;
+  compras?: CompraCreada[];
   qrPago?: QrInfo;
 }
 

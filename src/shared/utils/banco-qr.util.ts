@@ -204,10 +204,11 @@ class BancoQrUtil {
   }
 
   /**
-   * Calcular fecha de vencimiento (por defecto 1 día)
+   * Calcular fecha de vencimiento (en minutos)
+   * @param minutos - Tiempo de vencimiento en minutos (por defecto 10 minutos)
    */
-  calcularFechaVencimiento(horas: number = 24): Date {
-    return new Date(Date.now() + horas * 60 * 60 * 1000);
+  calcularFechaVencimiento(minutos: number = 10): Date {
+    return new Date(Date.now() + minutos * 60 * 1000);
   }
 
   /**

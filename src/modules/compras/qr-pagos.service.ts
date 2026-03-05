@@ -19,7 +19,7 @@ class QrPagosService {
     // Generar alias único usando el util existente
     const alias = bancoQrUtil.generarAliasUnico(compraId);
     const detalleGlosa = `Ticket - ${nombreEvento} - ${nombreUsuario}`;
-    const fechaVencimiento = bancoQrUtil.calcularFechaVencimiento(24);
+    const fechaVencimiento = bancoQrUtil.calcularFechaVencimiento(10); // 10 minutos de vencimiento
 
     // Llamar al banco
     const respuestaBanco = await bancoQrUtil.generarQrDinamico({
@@ -74,14 +74,32 @@ class QrPagosService {
    * Consulta el estado del QR al banco y actualiza la BD
    */
   async verificarEstado(qrPagoId: string): Promise<VerificarEstadoResponse> {
+    console.log('[QR] Buscando QR con ID:', qrPagoId);
+
     const qrPago = await prisma.qrPagos.findUnique({
       where: { id: qrPagoId },
     });
 
-    if (!qrPago) throw new Error('QR no encontrado');
+    if (!qrPago) {
+      console.warn('[QR] QR no encontrado en BD:', qrPagoId);
+      throw new Error('QR no encontrado');
+    }
+
+    console.log('[QR] QR encontrado:', {
+      id: qrPago.id,
+      alias: qrPago.alias,
+      estado: qrPago.estado,
+      compraId: qrPago.compraId
+    });
 
     // Consultar estado al banco
+    console.log('🏦 Consultando estado al banco MC4 para alias:', qrPago.alias);
     const respuestaBanco = await bancoQrUtil.verificarEstadoQr(qrPago.alias);
+    console.log('🏦 Respuesta del banco MC4:', {
+      codigo: respuestaBanco.codigo,
+      mensaje: respuestaBanco.mensaje,
+      objeto: respuestaBanco.objeto
+    });
 
     if (!bancoQrUtil.validarRespuestaBanco(respuestaBanco)) {
       throw new Error(`Error al verificar estado: ${respuestaBanco.mensaje}`);
@@ -89,6 +107,14 @@ class QrPagosService {
 
     const estadoActual = respuestaBanco.objeto.estadoActual;
     const estadoAnterior = qrPago.estado;
+
+    console.log('🔄 Estado del QR:', {
+      alias: qrPago.alias,
+      estadoAnterior,
+      estadoActual,
+      cambioDetectado: estadoAnterior !== estadoActual,
+      esPagado: estadoActual === 'PAGADO'
+    });
 
     // Actualizar estado en BD
     await prisma.qrPagos.update({

@@ -2,6 +2,7 @@
 import { Router } from 'express';
 import { authenticate } from '../../shared/middleware/auth';
 import comprasController from './compras.controller';
+import { handleWebhook } from './qr-pagos.controller';
 
 const router = Router();
 
@@ -29,11 +30,11 @@ router.get('/verificar-pago/:qrId', authenticate, comprasController.verificarPag
 router.get('/mis-compras', authenticate, comprasController.obtenerMisCompras);
 
 /**
- * @route   GET /api/compras/qr/:qrId
+ * @route   GET /api/compras/qr/info/:qrId
  * @desc    Obtener detalles de un QR
  * @access  Private (Usuario autenticado)
  */
-router.get('/qr/:qrId', authenticate, comprasController.obtenerQr);
+router.get('/qr/info/:qrId', authenticate, comprasController.obtenerQr);
 
 /**
  * @route   POST /api/compras/cancelar-qr/:qrId
@@ -50,11 +51,11 @@ router.post('/cancelar-qr/:qrId', authenticate, comprasController.cancelarQr);
 router.get('/:compraId', authenticate, comprasController.obtenerCompraDetalle);
 
 /**
- * @route   POST /api/compras/webhook-qr
+ * @route   POST /api/compras/webhook/banco
  * @desc    Webhook del banco para notificaciones de pago
  * @access  Public (sin autenticación, el banco envía notificaciones)
  */
-router.post('/webhook-qr', comprasController.webhookBanco);
+router.post('/webhook/banco', handleWebhook);
 
 /**
  * @route   POST /api/compras/limpiar-vencidos

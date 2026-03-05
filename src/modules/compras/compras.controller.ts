@@ -48,7 +48,8 @@ class ComprasController {
 
   /**
    * Verificar estado de pago
-   * GET /api/compras/verificar-pago/:qrId
+   * GET /api/compras/qr/verificar?id={qrPagoId}
+   * Compatible con ambos: parámetro de ruta y query parameter
    */
   async verificarPago(req: Request, res: Response): Promise<void> {
     try {
@@ -58,18 +59,33 @@ class ComprasController {
         return;
       }
 
-      const { qrId } = req.params;
+      // Aceptar ambos: parámetro de ruta (qrId) y query parameter (id)
+      const qrIdFromParam = (req.params as any).qrId || (req.params as any).id;
+      const qrIdFromQuery = req.query.id as string;
+      const finalQrId = qrIdFromQuery || qrIdFromParam;
 
-      if (!qrId) {
+      if (!finalQrId) {
+        console.warn('⚠️ verificarPago sin QR ID:', {
+          params: req.params,
+          query: req.query
+        });
         res.status(400).json({ success: false, message: 'QR ID es requerido' });
         return;
       }
 
-      const resultado = await comprasService.verificarPago(qrId, usuarioId);
+      console.log('🔍 Verificando pago:', { qrId: finalQrId, usuarioId });
+      const resultado = await comprasService.verificarPago(finalQrId, usuarioId);
+
+      console.log('📤 Respuesta de verificación:', {
+        success: resultado.success,
+        estado: resultado.qr?.estado,
+        pagoProcesado: resultado.pagoProcesado,
+        message: resultado.message
+      });
 
       res.status(200).json(resultado);
     } catch (error: any) {
-      console.error('Error en verificarPago controller:', error);
+      console.error('❌ Error en verificarPago controller:', error);
 
       if (error instanceof PagoQrError) {
         res.status(error.statusCode).json({ success: false, message: error.message, code: error.code });
