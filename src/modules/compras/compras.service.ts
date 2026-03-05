@@ -592,7 +592,7 @@ class ComprasService {
         take: limit,
         orderBy: { createdAt: 'desc' },
         include: {
-          evento: { select: { id: true, titulo: true, fecha: true, hora: true, ubicacion: true } },
+          evento: { select: { id: true, titulo: true, fecha: true, hora: true, ubicacion: true, direccion: true, imagenUrl: true } },
           asiento: { select: { id: true, fila: true, numero: true } },
           qrPago: { select: { id: true, alias: true, estado: true, imagenQr: true } }
         }

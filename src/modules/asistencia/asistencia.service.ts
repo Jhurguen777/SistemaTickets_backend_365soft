@@ -67,32 +67,30 @@ export class AsistenciaService {
     });
   }
 
-  // Retorna todos los asistentes de un evento
+  // Retorna todos los compradores de un evento con su estado de asistencia
   async listarPorEvento(eventoId: string) {
-    const asistencias = await prisma.asistencia.findMany({
-      where: {
-        compra: { eventoId },
-      },
+    const compras = await prisma.compra.findMany({
+      where: { eventoId, estadoPago: "PAGADO" },
       include: {
-        usuario: { select: { nombre: true, email: true, agencia: true } },
-        compra: {
-          include: {
-            asiento: { select: { fila: true, numero: true } },
-          },
-        },
+        usuario: { select: { nombre: true, email: true, ci: true, agencia: true } },
+        asiento: { select: { fila: true, numero: true } },
+        asistencia: { select: { id: true, ingresoEn: true } },
       },
-      orderBy: { ingresoEn: "asc" },
+      orderBy: { createdAt: "asc" },
     });
 
-    return asistencias.map((a) => ({
-      id:        a.id,
-      nombre:    a.usuario.nombre,
-      email:     a.usuario.email,
-      agencia:   a.usuario.agencia,
-      asiento:   a.compra.asiento
-        ? `Fila ${a.compra.asiento.fila}, Nº ${a.compra.asiento.numero}`
+    return compras.map((c) => ({
+      id:          c.id,
+      nombre:      c.usuario.nombre,
+      email:       c.usuario.email,
+      ci:          c.usuario.ci ?? "",
+      agencia:     c.usuario.agencia,
+      asiento:     c.asiento
+        ? `${c.asiento.fila}${c.asiento.numero}`
         : "N/A",
-      ingresoEn: a.ingresoEn,
+      asistencia:  c.asistencia ? "ASISTIO" : "PENDIENTE",
+      horaCheckIn: c.asistencia?.ingresoEn ?? null,
+      qrCode:      c.qrCode,
     }));
   }
 
@@ -134,11 +132,12 @@ export class AsistenciaService {
     const sheet = workbook.addWorksheet("Asistentes");
 
     sheet.columns = [
-      { header: "Nombre",           key: "nombre",    width: 30 },
-      { header: "Email",            key: "email",     width: 35 },
-      { header: "Agencia",          key: "agencia",   width: 25 },
-      { header: "Asiento",          key: "asiento",   width: 25 },
-      { header: "Fecha de Ingreso", key: "ingresoEn", width: 25 },
+      { header: "Nombre",           key: "nombre",      width: 30 },
+      { header: "Email",            key: "email",       width: 35 },
+      { header: "CI",               key: "ci",          width: 15 },
+      { header: "Asiento",          key: "asiento",     width: 15 },
+      { header: "Estado",           key: "asistencia",  width: 15 },
+      { header: "Fecha de Ingreso", key: "horaCheckIn", width: 25 },
     ];
 
     sheet.getRow(1).eachCell((cell: any) => {
@@ -152,11 +151,14 @@ export class AsistenciaService {
 
     asistentes.forEach((a) => {
       sheet.addRow({
-        nombre:    a.nombre,
-        email:     a.email,
-        agencia:   a.agencia ?? "-",
-        asiento:   a.asiento,
-        ingresoEn: new Date(a.ingresoEn).toLocaleString("es-AR"),
+        nombre:      a.nombre,
+        email:       a.email,
+        ci:          a.ci || "-",
+        asiento:     a.asiento,
+        asistencia:  a.asistencia,
+        horaCheckIn: a.horaCheckIn
+          ? new Date(a.horaCheckIn).toLocaleString("es-AR")
+          : "-",
       });
     });
 
