@@ -34,6 +34,40 @@ class ComprasService {
     params: IniciarPagoRequest
   ): Promise<IniciarPagoResponse> {
     try {
+      console.log('💳 iniciarPago - Datos recibidos:', {
+        usuarioId,
+        params
+      });
+
+      // Verificar si el usuario existe
+      const usuarioExiste = await prisma.usuario.findUnique({
+        where: { id: usuarioId },
+        select: { id: true, email: true, activo: true }
+      });
+
+      console.log('👤 Verificación de usuario:', {
+        usuarioId,
+        existe: !!usuarioExiste,
+        email: usuarioExiste?.email,
+        activo: usuarioExiste?.activo
+      });
+
+      if (!usuarioExiste) {
+        throw new PagoQrError(
+          `Usuario no encontrado en la base de datos: ${usuarioId}`,
+          'USUARIO_NOT_FOUND',
+          404
+        );
+      }
+
+      if (!usuarioExiste.activo) {
+        throw new PagoQrError(
+          'Usuario inactivo',
+          'USUARIO_INACTIVE',
+          403
+        );
+      }
+
       const asientosIds = params.asientosIds || [params.asientoId];
       const eventoId = params.eventoId;
       const userId = usuarioId; // Use the correct parameter name
@@ -169,8 +203,19 @@ class ComprasService {
       const alias = bancoQrUtil.generarAliasUnico(compras[0].id);
       const fechaVencimiento = bancoQrUtil.calcularFechaVencimiento(10); // 10 minutos de vencimiento
 
+      console.log('🎟️  Generando QR - Asientos disponibles:', {
+        totalAsientos: asientos.length,
+        asientos: asientos.map(a => ({ id: a.id, fila: a.fila, numero: a.numero, estado: a.estado }))
+      });
+
       const listaAsientos = asientos.map(a => `${a.fila}${a.numero}`).join(', ');
-      const detalleGlosa = `Ticket Evento: ${asientos[0].evento.titulo} - Asientos: ${listaAsientos}`;
+      const detalleGlosa = `Ticket Evento: ${asientos[0]?.evento?.titulo || 'Evento'} - Asientos: ${listaAsientos}`;
+
+      console.log('📋 Detalle QR:', {
+        listaAsientos,
+        detalleGlosa,
+        longitudDetalle: detalleGlosa.length
+      });
 
       let responseBanco: any;
       try {
@@ -514,6 +559,18 @@ class ComprasService {
             data: { estado: 'VENDIDO' as any, reservadoEn: null }
           });
         }
+        
+        // 6. ← AGREGAR ESTO
+        const cantidadComprada = comprasPendientes.length;
+        await tx.sectorEvento.updateMany({
+          where: { eventoId: qrPago.compra.eventoId },
+          data: {
+            disponible: {
+              decrement: cantidadComprada
+            }
+          }
+        });
+        console.log(`✅ Sectores actualizados: -${cantidadComprada} disponibles`);
 
         console.log(`✅ Pago procesado: QR ${qrPago.alias} - ${comprasPendientes.length} compras actualizadas`);
       });

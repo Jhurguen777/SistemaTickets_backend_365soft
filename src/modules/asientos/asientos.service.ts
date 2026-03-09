@@ -432,3 +432,121 @@ export const limpiarAsientosEvento = async (eventoId: string) => {
     throw error;
   }
 };
+
+export const reservarPorCantidad = async ({
+  eventoId,
+  cantidad,
+  userId,
+}: {
+  eventoId: string;
+  cantidad: number;
+  userId: string;
+}): Promise<{
+  success: boolean;
+  asientos: AsientoConEstadoReal[];
+  message: string;
+}> => {
+  // 1. Verificar que el evento exista y sea de modo CANTIDAD
+  const evento = await prisma.evento.findUnique({
+    where: { id: eventoId }
+  });
+
+  if (!evento) throw new Error('EVENTO_NO_ENCONTRADO');
+  if ((evento as any).modo !== 'CANTIDAD') throw new Error('EVENTO_NO_ES_CANTIDAD');
+  if (cantidad < 1 || cantidad > 10) throw new Error('CANTIDAD_INVALIDA');
+
+  // 2. Verificar capacidad disponible
+  const asientosVendidos = await prisma.asiento.count({
+    where: {
+      eventoId,
+      estado: { in: [EstadoAsiento.VENDIDO, EstadoAsiento.RESERVANDO, EstadoAsiento.BLOQUEADO] }
+    }
+  });
+
+  const disponibles = evento.capacidad - asientosVendidos;
+  if (disponibles < cantidad) {
+    throw new Error(`CAPACIDAD_INSUFICIENTE:${disponibles}`);
+  }
+
+  // 3. Buscar asientos DISPONIBLE existentes o crear nuevos
+  const asientosExistentes = await prisma.asiento.findMany({
+    where: { eventoId, estado: EstadoAsiento.DISPONIBLE },
+    orderBy: [{ fila: 'asc' }, { numero: 'asc' }],
+    take: cantidad
+  });
+
+  let asientosAReservar = asientosExistentes;
+
+  // Si no hay suficientes asientos en BD, crear los faltantes
+  if (asientosExistentes.length < cantidad) {
+    const faltantes = cantidad - asientosExistentes.length;
+
+    // Obtener el número más alto existente para continuar la numeración
+    const ultimoAsiento = await prisma.asiento.findFirst({
+      where: { eventoId },
+      orderBy: { numero: 'desc' }
+    });
+    const ultimoNumero = ultimoAsiento?.numero ?? 0;
+
+    const nuevosAsientos = await prisma.$transaction(async (tx) => {
+      const creados = [];
+      for (let i = 0; i < faltantes; i++) {
+        const asiento = await tx.asiento.create({
+          data: {
+            eventoId,
+            fila: 'General',
+            numero: ultimoNumero + i + 1,
+            precio: evento.precio,
+            estado: EstadoAsiento.DISPONIBLE,
+          }
+        });
+        creados.push(asiento);
+      }
+      return creados;
+    });
+
+    asientosAReservar = [...asientosExistentes, ...nuevosAsientos];
+  }
+
+  const asientosIds = asientosAReservar.map(a => a.id);
+
+  // 4. Intentar locks en Redis (silencioso si falla)
+  try {
+    const lockResult = await acquireBatchSeatLocks(eventoId, asientosIds, userId);
+    if (!lockResult.success) {
+      throw new Error('ASIENTOS_OCUPADOS');
+    }
+  } catch (err: any) {
+    if (err.message === 'ASIENTOS_OCUPADOS') throw err;
+    console.warn('⚠️ Redis no disponible, procediendo sin locks:', err);
+  }
+
+  // 5. Actualizar asientos a RESERVANDO
+  try {
+    await prisma.asiento.updateMany({
+      where: { id: { in: asientosIds } },
+      data: { estado: EstadoAsiento.RESERVANDO, reservadoEn: new Date() }
+    });
+
+    console.log(`✅ ${cantidad} tickets reservados (modo CANTIDAD) para usuario ${userId}`);
+
+    return {
+      success: true,
+      asientos: asientosAReservar.map((a, i) => ({
+        id: a.id,
+        numero: i + 1, // Numeración secuencial para el usuario
+        fila: 'General',
+        precio: evento.precio,
+        estado: EstadoAsiento.RESERVANDO,
+        eventoId: a.eventoId,
+        lockedByMe: true,
+        ttlSegundos: 180
+      })),
+      message: `${cantidad} ticket(s) reservado(s) por 3 minutos`
+    };
+  } catch (error) {
+    // Rollback locks
+    try { await releaseBatchSeatLocksForce(eventoId, asientosIds); } catch {}
+    throw error;
+  }
+};

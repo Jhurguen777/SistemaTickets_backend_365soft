@@ -119,6 +119,9 @@ class BancoQrUtil {
         unicoUso: true
       };
 
+      console.log('📤 Body enviado al banco:', JSON.stringify(body, null, 2));
+      console.log('📤 Headers enviados:', JSON.stringify(headers, null, 2));
+
       const response = await this.axiosClient.post<BancoGenerarQrResponse>(
         url,
         body,

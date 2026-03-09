@@ -12,7 +12,7 @@ import {
 // ── LISTAR EVENTOS ────────────────────────────────────────────────
 export const getAllEventos = async (req: AuthRequest, res: Response): Promise<void> => {
   try {
-    const { estado, fecha, ubicacion, page = '1', limit = '10', search } = req.query;
+    const { estado, fecha, ubicacion, page = '1', limit = '100', search } = req.query;
 
     const eventos = await getEventos({
       estado: estado as string,

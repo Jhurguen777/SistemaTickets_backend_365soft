@@ -7,7 +7,8 @@ import {
   liberarAsiento,
   reservarVarios as reservarVariosService,
   liberarVarios as liberarVariosService,
-  limpiarAsientosEvento
+  limpiarAsientosEvento,
+  reservarPorCantidad
 } from './asientos.service';
 
 interface AuthRequest extends Request {
@@ -234,5 +235,65 @@ export const limpiarEvento = async (req: AuthRequest, res: Response): Promise<vo
   } catch (err) {
     console.error('[Asientos limpiarEvento]', err);
     res.status(500).json({ ok: false, error: 'Error al limpiar asientos.' });
+  }
+};
+
+export const reservarCantidad = async (
+  req: Request & { io?: any; user?: any },
+  res: Response
+): Promise<void> => {
+  try {
+    const userId = req.user?.id;
+    if (!userId) {
+      res.status(401).json({ ok: false, error: 'No autenticado' });
+      return;
+    }
+
+    const { eventoId, cantidad } = req.body;
+
+    if (!eventoId || !cantidad) {
+      res.status(400).json({ ok: false, error: 'eventoId y cantidad son requeridos' });
+      return;
+    }
+
+    const resultado = await reservarPorCantidad({
+      eventoId,
+      cantidad: parseInt(cantidad),
+      userId,
+    });
+
+    // Emitir evento de socket si está disponible
+    if (req.io) {
+      req.io.to(eventoId).emit('seats:reserved', {
+        asientosIds: resultado.asientos.map(a => a.id),
+        estado: 'RESERVANDO',
+        userId,
+      });
+    }
+
+    res.status(200).json({
+      ok: true,
+      data: resultado.asientos,
+      message: resultado.message,
+    });
+  } catch (error: any) {
+    console.error('Error en reservarCantidad:', error);
+
+    const msg = error.message || '';
+
+    if (msg === 'EVENTO_NO_ENCONTRADO') {
+      res.status(404).json({ ok: false, error: 'Evento no encontrado' });
+    } else if (msg === 'EVENTO_NO_ES_CANTIDAD') {
+      res.status(400).json({ ok: false, error: 'El evento no es de tipo ticket general' });
+    } else if (msg.startsWith('CAPACIDAD_INSUFICIENTE')) {
+      const disponibles = msg.split(':')[1];
+      res.status(409).json({ ok: false, error: `Solo quedan ${disponibles} tickets disponibles` });
+    } else if (msg === 'CANTIDAD_INVALIDA') {
+      res.status(400).json({ ok: false, error: 'La cantidad debe ser entre 1 y 10' });
+    } else if (msg === 'ASIENTOS_OCUPADOS') {
+      res.status(409).json({ ok: false, error: 'Los tickets no están disponibles, intenta nuevamente' });
+    } else {
+      res.status(500).json({ ok: false, error: 'Error al reservar tickets' });
+    }
   }
 };

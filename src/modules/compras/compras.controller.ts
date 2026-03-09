@@ -16,6 +16,13 @@ class ComprasController {
   async iniciarPago(req: Request, res: Response): Promise<void> {
     try {
       const usuarioId = req.user?.id;
+      console.log('🔐 iniciarPago - Usuario autenticado:', {
+        usuarioId,
+        userEmail: req.user?.email,
+        isAdmin: req.user?.isAdmin,
+        tipoRol: req.user?.tipoRol
+      });
+
       if (!usuarioId) {
         res.status(401).json({ success: false, message: 'No autenticado' });
         return;

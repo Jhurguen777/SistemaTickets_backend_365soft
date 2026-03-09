@@ -8,7 +8,8 @@ import {
   liberar,
   reservarVarios,
   liberarVarios,
-  limpiarEvento
+  limpiarEvento,
+  reservarCantidad
 } from './asientos.controller';
 
 const injectIO = (io: SocketIOServer) =>
@@ -33,6 +34,9 @@ export const asientosRouter = (io: SocketIOServer): Router => {
 
   // Endpoint administrativo para limpiar asientos (pruebas/mantenimiento)
   router.post('/limpiar-evento/:eventoId', authMiddleware, withIO, limpiarEvento);
+
+  router.post('/reservar-cantidad', authMiddleware, withIO, reservarCantidad);
+
 
   return router;
 };

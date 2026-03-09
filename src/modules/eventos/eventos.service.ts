@@ -26,6 +26,7 @@ export interface CreateEventoData {
   organizer?: string;
   doorsOpen?: string;
   estado?: string;
+  modo?: 'ASIENTOS' | 'CANTIDAD';
   permitirMultiplesAsientos?: boolean;
   limiteAsientosPorUsuario?: number;
   sectores?: Array<{
@@ -53,6 +54,7 @@ export interface UpdateEventoData {
   doorsOpen?: string;
   estado?: string;
   activo?: boolean;
+  modo?: 'ASIENTOS' | 'CANTIDAD';
   permitirMultiplesAsientos?: boolean;
   limiteAsientosPorUsuario?: number;
   seatMapConfig?: any;
@@ -109,6 +111,7 @@ export const getEventos = async (filters: GetEventosFilters) => {
         estado: true,
         activo: true,
         seatMapConfig: true,
+        modo: true,          // ← agregado
         createdAt: true,
         _count: { select: { asientos: true, compras: true } },
         sectores: {
@@ -152,12 +155,12 @@ export const getEventoById = async (id: string) => {
       estado: true,
       activo: true,
       seatMapConfig: true,
+      modo: true,          // ← agregado
       createdAt: true,
       updatedAt: true,
       _count: { select: { asientos: true, compras: true } },
       sectores: { orderBy: { precio: 'asc' } },
       asientos: {
-        // ✅ FIX: Sin take: 10 — trae todos los asientos para el fallback
         orderBy: [{ fila: 'asc' }, { numero: 'asc' }],
         select: {
           id: true,
@@ -189,6 +192,7 @@ export const createEvento = async (data: CreateEventoData) => {
       organizer: data.organizer,
       doorsOpen: data.doorsOpen,
       estado: (data.estado || 'ACTIVO') as any,
+      modo: (data.modo || 'ASIENTOS') as any,   // ← agregado
       permitirMultiplesAsientos: data.permitirMultiplesAsientos || false,
       limiteAsientosPorUsuario: data.limiteAsientosPorUsuario || 1,
       seatMapConfig: data.seatMapConfig || null,
@@ -206,6 +210,7 @@ export const createEvento = async (data: CreateEventoData) => {
       hora: true, ubicacion: true, direccion: true, imagenUrl: true,
       capacidad: true, precio: true, categoria: true, subcategoria: true,
       organizer: true, doorsOpen: true, estado: true, seatMapConfig: true,
+      modo: true,        // ← agregado
       createdAt: true,
       sectores: {
         select: { id: true, nombre: true, precio: true, disponible: true, total: true }
@@ -275,6 +280,11 @@ export const createEvento = async (data: CreateEventoData) => {
       }
 
       if (asientosACrear.length > 0) {
+        console.log('═════════════════════════════════');
+        console.log('📋 ASIENTOS A CREAR PARA EVENTO:', evento.id);
+        console.log('📋 Total de asientos a crear:', asientosACrear.length);
+        console.log('═══════════════════════════════════');
+
         await prisma.asiento.createMany({
           data: asientosACrear,
           skipDuplicates: true
@@ -313,9 +323,12 @@ export const updateEvento = async (id: string, data: UpdateEventoData) => {
   });
   if (!existe) return null;
 
+  if (data.seatMapConfig) {
+    await prisma.asiento.deleteMany({ where: { eventoId: id } });
+  }
+
   if (data.sectores !== undefined) {
     await prisma.sectorEvento.deleteMany({ where: { eventoId: id } });
-    await prisma.asiento.deleteMany({ where: { eventoId: id } });
   }
 
   const evento = await prisma.evento.update({
@@ -336,6 +349,7 @@ export const updateEvento = async (id: string, data: UpdateEventoData) => {
       ...(data.doorsOpen      !== undefined && { doorsOpen: data.doorsOpen }),
       ...(data.estado                       && { estado: data.estado as any }),
       ...(data.activo         !== undefined && { activo: data.activo }),
+      ...(data.modo           !== undefined && { modo: data.modo as any }),   // ← agregado
       ...(data.permitirMultiplesAsientos !== undefined && { permitirMultiplesAsientos: data.permitirMultiplesAsientos }),
       ...(data.limiteAsientosPorUsuario  !== undefined && { limiteAsientosPorUsuario: data.limiteAsientosPorUsuario }),
       ...(data.seatMapConfig  !== undefined && { seatMapConfig: data.seatMapConfig }),
@@ -355,7 +369,7 @@ export const updateEvento = async (id: string, data: UpdateEventoData) => {
       hora: true, ubicacion: true, direccion: true, imagenUrl: true,
       capacidad: true, precio: true, categoria: true, subcategoria: true,
       organizer: true, doorsOpen: true, estado: true, activo: true,
-      seatMapConfig: true, updatedAt: true,
+      seatMapConfig: true, modo: true, updatedAt: true,   // ← agregado
       sectores: {
         select: { id: true, nombre: true, precio: true, disponible: true, total: true }
       }
@@ -376,7 +390,6 @@ export const updateEvento = async (id: string, data: UpdateEventoData) => {
         where: { eventoId: id },
         select: { id: true, nombre: true, precio: true }
       });
-      console.log('📋 Sectores en BD:', sectoresBD);
 
       const sectorPrecioMap = new Map<string, number>();
       for (const configSector of config.sectors || []) {
@@ -399,12 +412,10 @@ export const updateEvento = async (id: string, data: UpdateEventoData) => {
       }> = [];
 
       const sortedRows = [...rows].sort((a: any, b: any) => (a.order ?? 0) - (b.order ?? 0));
-      console.log('📊 Filas ordenadas (updateEvento):', sortedRows.map(r => ({ id: r.id, name: r.name, seats: r.seats, sectorId: r.sectorId })));
 
       for (const row of sortedRows) {
         const totalSeats: number = typeof row.seats === 'number' ? row.seats : 0;
         const sectorPrecioFila = sectorPrecioMap.get(row.sectorId);
-        console.log(`🪑 Procesando fila (updateEvento): ${row.name} (${row.id}), ${totalSeats} asientos, sector: ${row.sectorId}`);
 
         for (let i = 0; i < totalSeats; i++) {
           const specialSeat = config.specialSeats?.find(
@@ -432,24 +443,23 @@ export const updateEvento = async (id: string, data: UpdateEventoData) => {
         }
       }
 
-      console.log(`🪑 Asientos a crear: ${asientosACrear.length}`);
-      console.log('🪑 Primer asiento a crear:', asientosACrear[0]);
-      console.log('🪑 Último asiento a crear:', asientosACrear[asientosACrear.length - 1]);
-
       if (asientosACrear.length > 0) {
+        console.log('═════════════════════════════════');
+        console.log('📋 ASIENTOS A CREAR PARA EVENTO (UPDATE):', id);
+        console.log('📋 Total de asientos a crear:', asientosACrear.length);
+        console.log('═══════════════════════════════════');
+
         const resultado = await prisma.asiento.createMany({
           data: asientosACrear,
           skipDuplicates: true
         });
         console.log(`✅ ${resultado.count} asientos creados para el evento ${id}`);
       } else {
-        console.warn(`⚠️  seatMapConfig recibido pero no se generaron asientos. Revisar rows/seats.`);
+        console.warn(`⚠️  seatMapConfig recibido pero no se generaron asientos.`);
       }
     } else {
       console.warn('⚠️ No hay filas en seatMapConfig');
     }
-  } else {
-    console.log('ℹ️ No se envió seatMapConfig en la actualización');
   }
 
   return evento;
