@@ -6,6 +6,7 @@
 import prisma from '../../shared/config/database';
 import bancoQrUtil from '../../shared/utils/banco-qr.util';
 import { extenderLocksParaPago } from '../asientos/asientos.service';
+import { enviarConfirmacionPago } from '../../shared/utils/email.util';
 import {
   IniciarPagoRequest,
   IniciarPagoResponse,
@@ -574,6 +575,58 @@ class ComprasService {
 
         console.log(`✅ Pago procesado: QR ${qrPago.alias} - ${comprasPendientes.length} compras actualizadas`);
       });
+
+      // ─── Enviar email de confirmación (no-bloqueante) ───────────────────────
+      try {
+        const qrConInfo = await prisma.qrPagos.findUnique({
+          where: { id: qrPagoId },
+          include: {
+            compra: {
+              include: {
+                usuario: { select: { email: true, nombre: true } },
+                evento: { select: { titulo: true, fecha: true, ubicacion: true } }
+              }
+            }
+          }
+        });
+
+        if (qrConInfo?.compra?.usuario?.email) {
+          const comprasPagadas = await prisma.compra.findMany({
+            where: {
+              usuarioId: qrConInfo.compra.usuarioId,
+              eventoId: qrConInfo.compra.eventoId,
+              estadoPago: 'PAGADO',
+              updatedAt: { gte: new Date(Date.now() - 90 * 1000) } // actualizadas en los últimos 90 s
+            },
+            include: { asiento: { select: { fila: true, numero: true } } }
+          });
+
+          const fechaEvento = qrConInfo.compra.evento?.fecha
+            ? new Date(qrConInfo.compra.evento.fecha).toLocaleDateString('es-ES', {
+                weekday: 'long', day: 'numeric', month: 'long', year: 'numeric'
+              })
+            : '';
+
+          // Fire-and-forget
+          enviarConfirmacionPago({
+            email:          qrConInfo.compra.usuario.email,
+            nombre:         qrConInfo.compra.usuario.nombre,
+            eventoTitulo:   qrConInfo.compra.evento?.titulo ?? 'Evento',
+            eventoFecha:    fechaEvento,
+            eventoUbicacion: qrConInfo.compra.evento?.ubicacion ?? '',
+            monto:           qrConInfo.monto,
+            moneda:          qrConInfo.moneda,
+            compras: comprasPagadas.map(c => ({
+              asiento: `${c.asiento?.fila ?? ''}${c.asiento?.numero ?? ''}`,
+              qrCode:  c.qrCode ?? ''
+            }))
+          }).catch(err => console.error('[Email] No se pudo enviar email de confirmación:', err));
+        }
+      } catch (emailQueryError) {
+        console.error('[Email] Error consultando datos para email:', emailQueryError);
+      }
+      // ────────────────────────────────────────────────────────────────────────
+
     } catch (error: any) {
       console.error('❌ Error en procesarPagoQr:', error);
       throw new PagoQrError(`Error procesando pago: ${error.message}`, 'PROCESAR_PAGO_ERROR', 500);
