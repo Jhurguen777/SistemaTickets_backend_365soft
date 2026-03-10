@@ -185,6 +185,7 @@ model Compra {
   evento          Evento      @relation(fields: [eventoId], references: [id], onDelete: Cascade)
   asiento         Asiento     @relation(fields: [asientoId], references: [id], onDelete: Cascade)
   qrPago          QrPagos?    @relation(fields: [qrPagoId], references: [id])
+  datosAsistente  DatosAsistente?
   asistencia      Asistencia?
   certificado     Certificado?
 
@@ -289,6 +290,26 @@ model Reembolso {
   updatedAt      DateTime        @updatedAt
 
   @@map("reembolsos")
+}
+
+// ============================================
+// DATOS ASISTENTE
+// ============================================
+
+model DatosAsistente {
+  id                String   @id @default(uuid())
+  compraId          String   @unique
+  nombre            String
+  apellido          String
+  email             String?
+  telefono          String
+  documento         String?
+  oficina           String?
+  createdAt         DateTime @default(now())
+
+  compra            Compra   @relation(fields: [compraId], references: [id], onDelete: Cascade)
+
+  @@map("datos_asistentes")
 }
 
 // ============================================
