@@ -62,7 +62,7 @@ services:
   # ─── Frontend (Vite → nginx) ─────────────────────────────────────
   frontend:
     build:
-      context: ..
+      context: ../SistemaTickets_365soft
       dockerfile: Dockerfile
       args:
         VITE_API_URL: ${VITE_API_URL:-/api}

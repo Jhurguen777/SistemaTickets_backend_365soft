@@ -8,6 +8,7 @@ import { createAdapter } from '@socket.io/redis-adapter';
 import { redisClient, redisPub, redisSub } from './shared/config/redis';
 import prisma from './shared/config/database';
 import { setupSocketHandlers } from './sockets/seatSocket';
+import { setIo } from './shared/config/socket-instance';
 import passport from './modules/auth/passport.config';
 import authRoutes from './modules/auth/auth.routes';
 import eventoRoutes from './modules/eventos/eventos.routes';
@@ -55,6 +56,9 @@ const io = new Server(httpServer, {
   },
   transports: ['websocket', 'polling'],
 });
+
+// Registrar la instancia io en el módulo compartido (sin importación circular)
+setIo(io);
 
 // Redis Adapter para escalabilidad horizontal
 if (process.env.REDIS_URL && redisPub.isReady && redisSub.isReady) {

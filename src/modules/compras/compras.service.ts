@@ -7,6 +7,7 @@ import prisma from '../../shared/config/database';
 import bancoQrUtil from '../../shared/utils/banco-qr.util';
 import { extenderLocksParaPago } from '../asientos/asientos.service';
 import { enviarConfirmacionPago } from '../../shared/utils/email.util';
+import { getIo } from '../../shared/config/socket-instance';
 import {
   IniciarPagoRequest,
   IniciarPagoResponse,
@@ -590,6 +591,32 @@ class ComprasService {
 
         console.log(`✅ Pago procesado: QR ${qrPago.alias} - ${comprasPendientes.length} compras actualizadas`);
       });
+
+      // ── Emitir evento Socket.IO para notificación instantánea al frontend ─────────────────────
+      try {
+        const io = getIo();
+        if (io) {
+          // Obtener datos del QR para el payload
+          const qrInfo = await prisma.qrPagos.findUnique({
+            where: { id: qrPagoId },
+            include: {
+              compra: { select: { usuarioId: true, eventoId: true } }
+            }
+          });
+          if (qrInfo?.compra) {
+            io.emit('pago:confirmado', {
+              qrPagoId: qrInfo.id,
+              usuarioId: qrInfo.compra.usuarioId,
+              eventoId: qrInfo.compra.eventoId,
+            });
+            console.log(`📡 Socket pago:confirmado emitido para QR ${qrInfo.alias}`);
+          }
+        }
+      } catch (socketErr) {
+        // No bloquear el flujo si el socket falla
+        console.warn('⚠️ No se pudo emitir evento Socket.IO:', socketErr);
+      }
+      // ──────────────────────────────────────────────────────────────────
 
       // ─── Enviar email de confirmación (no-bloqueante) ───────────────────────
       try {
