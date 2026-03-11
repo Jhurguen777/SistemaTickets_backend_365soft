@@ -7,18 +7,45 @@
 // REQUESTS
 // ============================================
 
+export interface AsistenteInput {
+  asientoId: string;
+  nombre: string;
+  apellido: string;
+  email: string;
+  telefono: string;
+  documento: string;
+  oficina?: string;
+}
+
+// Para boletos generales (modo CANTIDAD) — sin asientoId
+export interface AsistenteGeneralInput {
+  nombre: string;
+  apellido: string;
+  email: string;
+  telefono: string;
+  documento: string;
+  oficina?: string;
+}
+
 export interface IniciarPagoRequest {
   asientoId: string;
   eventoId: string;
   monto?: number;
   asientosIds?: string[];
-  datosAsistente?: DatosAsistente;
+  asistentes?: AsistenteInput[];
 }
 
-export interface DatosAsistente {
-  nombre: string;
-  email: string;
-  telefono: string;
+export interface CrearConReservaRequest {
+  eventoId: string;
+  asistentes: AsistenteInput[];
+  medioPago: string;
+}
+
+export interface CrearCompraGeneralRequest {
+  eventoId: string;
+  cantidad: number;
+  asistentes: AsistenteGeneralInput[];
+  medioPago: string;
 }
 
 export interface GenerarQrRequest {
@@ -47,7 +74,8 @@ export interface CompraCreada {
   id: string;
   usuarioId: string;
   eventoId: string;
-  asientoId: string;
+  asientoId?: string | null;
+  numeroBoleto?: number | null;
   monto: number;
   moneda: string;
   estadoPago: string;
@@ -223,19 +251,29 @@ export interface CompraConDetalles {
   metodoPago: string | null;
   qrPagoAlias: string | null;
   qrCode: string;
+  numeroBoleto: number | null;
   createdAt: Date;
+  // Datos del asistente
+  nombreAsistente: string | null;
+  apellidoAsistente: string | null;
+  emailAsistente: string | null;
+  telefonoAsistente: string | null;
+  documentoAsistente: string | null;
+  oficina: string | null;
   evento: {
     id: string;
     titulo: string;
     fecha: Date;
     hora: string;
     ubicacion: string;
+    direccion: string | null;
+    imagenUrl: string | null;
   };
   asiento: {
     id: string;
     fila: string;
     numero: number;
-  };
+  } | null;
   qrPago?: {
     id: string;
     alias: string;

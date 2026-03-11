@@ -164,26 +164,34 @@ model QrPagos {
 // ============================================
 
 model Compra {
-  id              String      @id @default(uuid())
-  usuarioId       String
-  eventoId        String
-  asientoId       String      @unique
-  monto           Float
-  moneda          String      @default("USD")
-  metodoPago      String?
-  estadoPago      EstadoPago  @default(PENDIENTE)
-  stripePaymentId String?     @unique
-  qrPagoId        String?     @unique
-  qrPagoAlias     String?     @unique
-  qrCode          String      @unique
-  qrCodeUsado     Boolean     @default(false)
-  certificadoUrl  String?
-  createdAt       DateTime    @default(now())
-  updatedAt       DateTime    @updatedAt
+  id                 String      @id @default(uuid())
+  usuarioId          String
+  eventoId           String
+  asientoId          String?     @unique
+  numeroBoleto       Int?
+  monto              Float
+  moneda             String      @default("BOB")
+  metodoPago         String?
+  estadoPago         EstadoPago  @default(PENDIENTE)
+  stripePaymentId    String?     @unique
+  qrPagoId           String?     @unique
+  qrPagoAlias        String?     @unique
+  qrCode             String      @unique
+  qrCodeUsado        Boolean     @default(false)
+  certificadoUrl     String?
+  // Datos del asistente (persona que usará el ticket)
+  nombreAsistente    String?
+  apellidoAsistente  String?
+  emailAsistente     String?
+  telefonoAsistente  String?
+  documentoAsistente String?
+  oficina            String?
+  createdAt          DateTime    @default(now())
+  updatedAt          DateTime    @updatedAt
 
   usuario         Usuario     @relation(fields: [usuarioId], references: [id], onDelete: Cascade)
   evento          Evento      @relation(fields: [eventoId], references: [id], onDelete: Cascade)
-  asiento         Asiento     @relation(fields: [asientoId], references: [id], onDelete: Cascade)
+  asiento         Asiento?    @relation(fields: [asientoId], references: [id], onDelete: Cascade)
   qrPago          QrPagos?    @relation(fields: [qrPagoId], references: [id])
   asistencia      Asistencia?
   certificado     Certificado?

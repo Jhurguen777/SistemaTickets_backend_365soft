@@ -456,7 +456,9 @@ export const getEventUsers = async (eventId: string) => {
   compras.forEach(compra => {
     const usuario = compra.usuario;
     const usuarioId = usuario.id;
-    const asientoStr = `${compra.asiento.fila}${compra.asiento.numero}`;
+    const asientoStr = compra.asiento
+      ? `${compra.asiento.fila}${compra.asiento.numero}`
+      : `#${(compra as any).numeroBoleto ?? ''}`.trim();
 
     if (!usuariosMap.has(usuarioId)) {
       usuariosMap.set(usuarioId, {

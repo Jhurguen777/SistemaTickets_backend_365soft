@@ -7,8 +7,22 @@ import { handleWebhook } from './qr-pagos.controller';
 const router = Router();
 
 /**
+ * @route   POST /api/compras/crear-con-reserva
+ * @desc    Crear compra con datos de asistentes y generar QR en un solo paso
+ * @access  Private (Usuario autenticado)
+ */
+router.post('/crear-con-reserva', authenticate, comprasController.crearConReserva);
+
+/**
+ * @route   POST /api/compras/crear-general
+ * @desc    Crear boletos generales (modo CANTIDAD) — sin asientos asignados
+ * @access  Private (Usuario autenticado)
+ */
+router.post('/crear-general', authenticate, comprasController.crearCompraGeneral);
+
+/**
  * @route   POST /api/compras/iniciar-pago
- * @desc    Iniciar proceso de pago con QR
+ * @desc    Iniciar proceso de pago con QR (legacy, sin datos de asistente)
  * @access  Private (Usuario autenticado)
  */
 router.post('/iniciar-pago', authenticate, comprasController.iniciarPago);

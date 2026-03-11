@@ -22,12 +22,16 @@ class BancoQrUtil {
 
   constructor() {
     // Configuración desde variables de entorno
+    const requiredVars = ['BANCO_QR_API_URL', 'BANCO_QR_API_KEY', 'BANCO_QR_SERVICE_KEY', 'BANCO_QR_USERNAME', 'BANCO_QR_PASSWORD'];
+    for (const v of requiredVars) {
+      if (!process.env[v]) throw new Error(`Environment variable ${v} is required`);
+    }
     this.config = {
-      apiUrl: process.env.BANCO_QR_API_URL || 'https://sip.mc4.com.bo:8443',
-      apiKey: process.env.BANCO_QR_API_KEY || '2977cb47ecc0fd3a326bd0c0cf57d04becaa59c2f101c3f7',
-      serviceKey: process.env.BANCO_QR_SERVICE_KEY || '939aa1fcf73a32a737d495a059104a9a60a707074bceef68',
-      username: process.env.BANCO_QR_USERNAME || 'dev365',
-      password: process.env.BANCO_QR_PASSWORD || '365Soft',
+      apiUrl: process.env.BANCO_QR_API_URL!,
+      apiKey: process.env.BANCO_QR_API_KEY!,
+      serviceKey: process.env.BANCO_QR_SERVICE_KEY!,
+      username: process.env.BANCO_QR_USERNAME!,
+      password: process.env.BANCO_QR_PASSWORD!,
       timeout: parseInt(process.env.BANCO_QR_TIMEOUT || '30000')
     };
 
@@ -67,8 +71,6 @@ class BancoQrUtil {
         body,
         { headers }
       );
-
-      console.log('🏦 Respuesta banco token:', JSON.stringify(response.data));
 
       if (response.data.codigo !== '0000' && response.data.codigo !== 'OK') {
         throw new Error(`Error generando token: ${response.data.mensaje}`);
@@ -118,9 +120,6 @@ class BancoQrUtil {
         tipoSolicitud: 'API',
         unicoUso: true
       };
-
-      console.log('📤 Body enviado al banco:', JSON.stringify(body, null, 2));
-      console.log('📤 Headers enviados:', JSON.stringify(headers, null, 2));
 
       const response = await this.axiosClient.post<BancoGenerarQrResponse>(
         url,

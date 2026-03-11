@@ -21,6 +21,28 @@ import comprasService from './modules/compras/compras.service';
 
 dotenv.config();
 
+// ── VALIDACIÓN DE ENTORNO (fail-fast) ────────────────────────────────────
+const REQUIRED_ENV = [
+  'JWT_SECRET',
+  'DATABASE_URL',
+  'REDIS_URL',
+  'GOOGLE_CLIENT_ID',
+  'GOOGLE_CLIENT_SECRET',
+  'GOOGLE_CALLBACK_URL',
+  'BANCO_QR_API_URL',
+  'BANCO_QR_API_KEY',
+  'BANCO_QR_SERVICE_KEY',
+  'BANCO_QR_USERNAME',
+  'BANCO_QR_PASSWORD',
+] as const;
+
+for (const key of REQUIRED_ENV) {
+  if (!process.env[key]) {
+    console.error(`❌ Variable de entorno requerida no definida: ${key}`);
+    process.exit(1);
+  }
+}
+
 const app: Express = express();
 const httpServer = createServer(app);
 
@@ -47,11 +69,14 @@ if (process.env.REDIS_URL && redisPub.isReady && redisSub.isReady) {
 }
 
 // ── MIDDLEWARES ───────────────────────────────────────────────
+const corsOrigins = [
+  process.env.FRONTEND_URL,
+  process.env.FRONTEND_PROD_URL,
+  ...(process.env.CORS_ORIGIN ? process.env.CORS_ORIGIN.split(',') : []),
+].map(o => o?.trim()).filter(Boolean) as string[];
+
 app.use(cors({
-  origin: [
-    process.env.FRONTEND_URL || 'http://localhost:5173',
-    process.env.FRONTEND_PROD_URL || ''
-  ].filter(Boolean),
+  origin: corsOrigins.length ? corsOrigins : 'http://localhost:5173',
   credentials: true,
   methods: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH', 'OPTIONS'],
   allowedHeaders: ['Content-Type', 'Authorization'],

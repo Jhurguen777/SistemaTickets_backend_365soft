@@ -64,23 +64,16 @@ export async function generarQr(req: Request, res: Response): Promise<void> {
  */
 export async function verificarEstado(req: Request, res: Response): Promise<void> {
   try {
-    console.log('🎯 verificarEstado controller INICIADO');
-
     // Aceptar ambos: parámetro de ruta y query parameter
     const qrIdFromParam = (req.params as any).qrPagoId;
     const qrIdFromQuery = req.query.id as string;
     const finalQrId = qrIdFromQuery || qrIdFromParam;
 
     if (!finalQrId) {
-      console.warn('[QR] verificarEstado sin QR ID:', {
-        params: req.params,
-        query: req.query
-      });
       res.status(400).json({ success: false, message: 'QR ID es requerido' });
       return;
     }
 
-    console.log('[QR] Verificando estado:', { qrId: finalQrId });
     const resultado = await qrPagosService.verificarEstado(finalQrId);
 
     res.status(200).json({
@@ -110,8 +103,6 @@ export async function handleWebhook(req: Request, res: Response): Promise<void> 
       res.status(200).json({ codigo: '1212', mensaje: 'Alias requerido' });
       return;
     }
-
-    console.log('📬 Webhook recibido del banco:', payload);
 
     const resultado = await comprasService.manejarWebhook(payload);
     res.status(200).json(resultado);

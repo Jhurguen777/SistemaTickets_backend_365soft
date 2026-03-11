@@ -5,10 +5,89 @@
 
 import { Request, Response } from 'express';
 import comprasService from './compras.service';
-import { PagoQrError } from './types';
-import prisma from '../../shared/config/database'; // ✅ instancia compartida
+import { PagoQrError, CrearConReservaRequest, CrearCompraGeneralRequest } from './types';
+import prisma from '../../shared/config/database';
 
 class ComprasController {
+  /**
+   * Crear compra con datos de asistentes y generar QR en un solo paso
+   * POST /api/compras/crear-con-reserva
+   */
+  async crearConReserva(req: Request, res: Response): Promise<void> {
+    try {
+      const usuarioId = req.user?.id;
+      if (!usuarioId) {
+        res.status(401).json({ success: false, message: 'No autenticado' });
+        return;
+      }
+
+      const { eventoId, asistentes, medioPago } = req.body as CrearConReservaRequest;
+
+      if (!eventoId || !asistentes || !Array.isArray(asistentes) || asistentes.length === 0) {
+        res.status(400).json({ success: false, message: 'Faltan datos requeridos: eventoId y asistentes' });
+        return;
+      }
+
+      for (const a of asistentes) {
+        if (!a.asientoId || !a.nombre || !a.apellido) {
+          res.status(400).json({ success: false, message: 'Cada asistente requiere asientoId, nombre y apellido' });
+          return;
+        }
+      }
+
+      const resultado = await comprasService.crearConReserva(usuarioId, { eventoId, asistentes, medioPago });
+      res.status(201).json(resultado);
+    } catch (error: any) {
+      if (error instanceof PagoQrError) {
+        res.status(error.statusCode).json({ success: false, message: error.message, code: error.code });
+        return;
+      }
+      res.status(500).json({ success: false, message: 'Error interno del servidor', error: error.message });
+    }
+  }
+
+  /**
+   * Crear boletos generales (modo CANTIDAD) — sin asientos asignados
+   * POST /api/compras/crear-general
+   */
+  async crearCompraGeneral(req: Request, res: Response): Promise<void> {
+    try {
+      const usuarioId = req.user?.id;
+      if (!usuarioId) {
+        res.status(401).json({ success: false, message: 'No autenticado' });
+        return;
+      }
+
+      const { eventoId, cantidad, asistentes, medioPago } = req.body as CrearCompraGeneralRequest;
+
+      if (!eventoId || !cantidad || !asistentes || !Array.isArray(asistentes)) {
+        res.status(400).json({ success: false, message: 'Faltan datos requeridos: eventoId, cantidad y asistentes' });
+        return;
+      }
+
+      if (asistentes.length !== cantidad) {
+        res.status(400).json({ success: false, message: 'La cantidad de asistentes debe coincidir con la cantidad de boletos' });
+        return;
+      }
+
+      for (const a of asistentes) {
+        if (!a.nombre || !a.apellido) {
+          res.status(400).json({ success: false, message: 'Cada asistente requiere nombre y apellido' });
+          return;
+        }
+      }
+
+      const resultado = await comprasService.crearCompraGeneral(usuarioId, { eventoId, cantidad, asistentes, medioPago });
+      res.status(201).json(resultado);
+    } catch (error: any) {
+      if (error instanceof PagoQrError) {
+        res.status(error.statusCode).json({ success: false, message: error.message, code: error.code });
+        return;
+      }
+      res.status(500).json({ success: false, message: 'Error interno del servidor', error: error.message });
+    }
+  }
+
   /**
    * Iniciar proceso de pago
    * POST /api/compras/iniciar-pago

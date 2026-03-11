@@ -28,21 +28,12 @@ export const authenticate = async (
   try {
     const token = req.headers.authorization?.replace('Bearer ', '');
 
-    // Log para depuración de peticiones
-    if (req.path.includes('/qr/verificar') || req.path.includes('/verificar-pago')) {
-      console.log('🔐 Middleware authenticate:', {
-        method: req.method,
-        path: req.path,
-        query: req.query,
-        hasToken: !!token
-      });
-    }
     if (!token) {
       res.status(401).json({ error: 'No autorizado - Token no proporcionado' });
       return;
     }
 
-    const decoded = jwt.verify(token, process.env.JWT_SECRET || 'secret') as { id: string };
+    const decoded = jwt.verify(token, process.env.JWT_SECRET!) as { id: string };
 
     // Primero buscar en la tabla de roles (administradores)
     const rol = await prisma.adminRol.findUnique({
@@ -61,7 +52,6 @@ export const authenticate = async (
         tipoRol: rol.tipoRol,
         isAdmin: true
       };
-      console.log('✅ Usuario administrador autenticado:', { id: rol.id, email: rol.email });
       next();
       return;
     }
@@ -90,7 +80,6 @@ export const authenticate = async (
       apellido: user.apellido || undefined,
       isAdmin:  user.rol === 'ADMIN'
     };
-    console.log('✅ Usuario autenticado:', { id: user.id, email: user.email, isAdmin: user.rol === 'ADMIN' });
     next();
 
   } catch (error: any) {

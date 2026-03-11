@@ -1,41 +1,63 @@
-# Dependencies
+# ── Dependencias ──────────────────────────────────────────────────
 node_modules/
 .pnp
 .pnp.js
 
-# Testing
-coverage/
-
-# Production
+# ── Build ──────────────────────────────────────────────────────────
 dist/
 build/
 
-# Environment
+# ── Variables de entorno (NUNCA subir al repo) ─────────────────────
 .env
-.env.local
-.env.production
+.env.*
+!.env.example
 
-# Logs
+# ── Logs ───────────────────────────────────────────────────────────
 logs/
 *.log
 npm-debug.log*
 yarn-debug.log*
 yarn-error.log*
+pnpm-debug.log*
 
-# IDE
+# ── Testing ────────────────────────────────────────────────────────
+coverage/
+
+# ── Docker (overrides locales, nunca el principal) ─────────────────
+docker-compose.override.yml
+
+# ── Certificados y claves privadas ────────────────────────────────
+*.pem
+*.key
+*.crt
+*.cert
+*.p12
+*.pfx
+
+# ── Archivos subidos por usuarios ─────────────────────────────────
+uploads/
+public/uploads/
+
+# ── Base de datos locales ──────────────────────────────────────────
+*.sqlite
+*.sqlite3
+*.db
+
+# ── npm auth ───────────────────────────────────────────────────────
+.npmrc
+
+# ── IDE ────────────────────────────────────────────────────────────
 .vscode/
 .idea/
 *.swp
 *.swo
 *~
 
-# OS
+# ── OS ─────────────────────────────────────────────────────────────
 .DS_Store
 Thumbs.db
+desktop.ini
 
-# Prisma
-prisma/migrations/
-
-# Temporary
+# ── Temporales ─────────────────────────────────────────────────────
 tmp/
 temp/
