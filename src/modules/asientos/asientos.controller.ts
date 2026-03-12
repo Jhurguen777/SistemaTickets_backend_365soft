@@ -153,11 +153,20 @@ export const reservarVarios = async (req: AuthRequest, res: Response): Promise<v
 
     const resultado = await reservarVariosService({ asientosIds, eventoId, userId });
 
+    console.log('🎉 reservarVariosService completado, resultado:', resultado);
+    console.log('🔍 req.io existe?', !!req.io);
+
     // Emitir notificación a todos los clientes conectados al evento
-    req.io?.to(`evento:${eventoId}`).emit('asiento:reservado', {
-      asientosIds: resultado.asientos.map(a => a.id),
-      estado: 'RESERVANDO',
-    });
+    try {
+      console.log('📡 EMITIENDO asiento:reservado para evento:', eventoId, 'asientos:', resultado.asientos.map(a => a.id));
+      req.io?.to(`evento:${eventoId}`).emit('asiento:reservado', {
+        asientosIds: resultado.asientos.map(a => a.id),
+        estado: 'RESERVANDO',
+      });
+      console.log('✅ Evento asiento:reservado emitido correctamente');
+    } catch (socketError) {
+      console.error('❌ ERROR emitiendo evento asiento:reservado:', socketError);
+    }
 
     res.json({
       ok: true,
@@ -195,11 +204,20 @@ export const liberarVarios = async (req: AuthRequest, res: Response): Promise<vo
 
     await liberarVariosService({ asientosIds, eventoId, userId });
 
+    console.log('🎉 liberarVariosService completado');
+    console.log('🔍 req.io existe?', !!req.io);
+
     // Emitir notificación a todos los clientes conectados al evento
-    req.io?.to(`evento:${eventoId}`).emit('asiento:liberado', {
-      asientosIds,
-      estado: 'DISPONIBLE',
-    });
+    try {
+      console.log('📡 EMITIENDO asiento:liberado para evento:', eventoId, 'asientos:', asientosIds);
+      req.io?.to(`evento:${eventoId}`).emit('asiento:liberado', {
+        asientosIds,
+        estado: 'DISPONIBLE',
+      });
+      console.log('✅ Evento asiento:liberado emitido correctamente');
+    } catch (socketError) {
+      console.error('❌ ERROR emitiendo evento asiento:liberado:', socketError);
+    }
 
     res.json({
       ok: true,
