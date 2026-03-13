@@ -159,27 +159,35 @@ export class AsistenciaService {
         usuario: { select: { nombre: true, email: true, ci: true, agencia: true } },
         asiento: { select: { fila: true, numero: true } },
         asistencia: { select: { id: true, ingresoEn: true } },
-        datosAsistente: true, // Incluir datos del asistente
+        datosAsistente: true,
+        evento: { select: { modo: true } },
       },
       orderBy: { createdAt: "asc" },
     });
 
-    return compras.map((c) => ({
-      id:          c.id,
-      nombre:      c.datosAsistente?.nombre || c.usuario.nombre,
-      email:       c.datosAsistente?.email || c.usuario.email,
-      ci:          (c.datosAsistente?.documento || c.usuario.ci) ?? "",
-      agencia:     c.datosAsistente?.oficina || c.usuario.agencia || "N/A",
-      asiento:     c.asiento
-        ? `${c.asiento.fila}${c.asiento.numero}`
-        : "N/A",
-      asistencia:  c.asistencia ? "ASISTIO" : "PENDIENTE",
-      horaCheckIn: c.asistencia?.ingresoEn ?? null,
-      qrCode:      c.qrCode,
-      // Datos del asistente
-      asistenteRegistrada: (c.datosAsistente as any)?.asistenciaRegistrada || false,
-      fechaAsistencia: (c.datosAsistente as any)?.fechaAsistencia || null,
-    }));
+    return compras.map((c) => {
+      // Priorizar DatosAsistentes (nueva tabla), luego campos directos de Compra, luego cuenta usuario
+      const da = c.datosAsistente
+      const nombreCompleto = da
+        ? `${da.nombre} ${da.apellido}`.trim()
+        : [c.nombreAsistente, c.apellidoAsistente].filter(Boolean).join(" ").trim()
+      const esGeneral = (c as any).evento?.modo === "CANTIDAD"
+      return {
+        id:                  c.id,
+        nombre:              nombreCompleto || c.usuario.nombre,
+        email:               da?.email || c.emailAsistente || c.usuario.email,
+        ci:                  da?.documento || c.documentoAsistente || c.usuario.ci || "",
+        agencia:             da?.oficina || c.oficina || c.usuario.agencia || "N/A",
+        asiento:             c.asiento ? `${c.asiento.fila}${c.asiento.numero}` : null,
+        numeroBoleto:        esGeneral ? (c as any).numeroBoleto ?? null : null,
+        esGeneral,
+        asistencia:          c.asistencia ? "ASISTIO" : "PENDIENTE",
+        horaCheckIn:         c.asistencia?.ingresoEn ?? null,
+        qrCode:              c.qrCode,
+        asistenteRegistrada: da?.asistenciaRegistrada || false,
+        fechaAsistencia:     da?.fechaAsistencia || null,
+      }
+    });
   }
 
   // Estadísticas de asistencia para un evento
