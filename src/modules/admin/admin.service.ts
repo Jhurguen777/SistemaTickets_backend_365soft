@@ -402,7 +402,7 @@ export const getUserPurchases = async (userId: string) => {
 
 // ── OBTENER USUARIOS POR EVENTO ────────────────────────────────────────
 export const getEventUsers = async (eventId: string) => {
-  // Obtener todas las compras PAGADAS para este evento
+  // Obtener todas las compras PAGADAS para este evento con sus datos de asistentes
   const compras = await prisma.compra.findMany({
     where: {
       eventoId: eventId,
@@ -432,58 +432,58 @@ export const getEventUsers = async (eventId: string) => {
           id: true,
           titulo: true
         }
-      }
+      },
+      datosAsistente: true // Incluir datos de asistentes individuales
     },
     orderBy: { createdAt: 'desc' }
   });
 
-  // Agrupar por usuario para no duplicar usuarios con múltiples compras
-  const usuariosMap = new Map<string, {
-    id: string;
-    eventId: string;
-    eventTitle: string;
-    nombre: string;
-    email: string;
-    telefono: string;
-    sector: string;
-    cantidad: number;
-    totalPagado: number;
-    fechaCompra: Date;
-    estadoPago: string;
-    asientos: string[];
-  }>();
-
-  compras.forEach(compra => {
-    const usuario = compra.usuario;
-    const usuarioId = usuario.id;
+  // Crear un array con cada asistente individualmente
+  const asistentes = compras.map(compra => {
+    const datosAsistente = compra.datosAsistente;
     const asientoStr = compra.asiento
       ? `${compra.asiento.fila}${compra.asiento.numero}`
-      : `#${(compra as any).numeroBoleto ?? ''}`.trim();
+      : `#${compra.numeroBoleto ?? ''}`.trim();
 
-    if (!usuariosMap.has(usuarioId)) {
-      usuariosMap.set(usuarioId, {
-        id: usuario.id,
-        eventId: compra.evento.id,
-        eventTitle: compra.evento.titulo,
-        nombre: `${usuario.nombre}${usuario.apellido ? ' ' + usuario.apellido : ''}`,
-        email: usuario.email,
-        telefono: usuario.telefono || 'No registrado',
-        sector: usuario.agencia || 'General', // Usar agencia como sector
-        cantidad: 1,
-        totalPagado: compra.monto,
-        estadoPago: compra.estadoPago,
-        fechaCompra: compra.createdAt,
-        asientos: [asientoStr]
-      });
-    } else {
-      // Sumar cantidad y monto si el usuario tiene múltiples compras
-      const usuarioExistente = usuariosMap.get(usuarioId)!;
-      usuarioExistente.cantidad += 1;
-      usuarioExistente.totalPagado += compra.monto;
-      usuarioExistente.asientos.push(asientoStr);
-    }
+    // Usar datos de DatosAsistentes si existen, sino usar los campos legacy
+    const nombre = datosAsistente?.nombre || compra.nombreAsistente || compra.usuario.nombre;
+    const apellido = datosAsistente?.apellido || compra.apellidoAsistente || compra.usuario.apellido || '';
+    const email = datosAsistente?.email || compra.emailAsistente || compra.usuario.email;
+    const telefono = datosAsistente?.telefono || compra.telefonoAsistente || compra.usuario.telefono || 'No registrado';
+    const documento = datosAsistente?.documento || compra.documentoAsistente || compra.usuario.ci || 'No registrado';
+    const oficina = datosAsistente?.oficina || compra.oficina || compra.usuario.agencia || 'General';
+    const asistenciaRegistrada = datosAsistente?.asistenciaRegistrada || false;
+    const fechaAsistencia = datosAsistente?.fechaAsistencia || null;
+
+    return {
+      id: compra.id, // ID de la compra como identificador del asistente
+      eventId: compra.evento.id,
+      eventTitle: compra.evento.titulo,
+      nombre: `${nombre}${apellido ? ' ' + apellido : ''}`,
+      nombreCompleto: nombre,
+      apellido: apellido || '',
+      email: email,
+      telefono: telefono,
+      documento: documento,
+      sector: oficina,
+      cantidad: 1, // Cada asistente representa 1 ticket
+      totalPagado: compra.monto,
+      estadoPago: compra.estadoPago,
+      fechaCompra: compra.createdAt,
+      asiento: asientoStr,
+      asientos: [asientoStr],
+      // Datos del comprador (para referencia)
+      comprador: {
+        id: compra.usuario.id,
+        nombre: `${compra.usuario.nombre}${compra.usuario.apellido ? ' ' + compra.usuario.apellido : ''}`,
+        email: compra.usuario.email
+      },
+      // Datos de asistencia
+      asistenciaRegistrada,
+      fechaAsistencia,
+      qrCode: compra.qrCode
+    };
   });
 
-  // Convertir el Map a un array
-  return Array.from(usuariosMap.values());
+  return asistentes;
 };

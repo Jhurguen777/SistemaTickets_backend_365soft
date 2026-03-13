@@ -10,6 +10,11 @@ interface VerificarQRInput {
   adminId: string;
 }
 
+interface MarcarAsistenciaManualInput {
+  compraId: string;
+  adminId: string;
+}
+
 export class AsistenciaService {
   // Verifica la validez del QR y registra la asistencia en una transacción atómica
   async verificarYRegistrar(input: VerificarQRInput) {
@@ -26,6 +31,7 @@ export class AsistenciaService {
           usuario: { select: { id: true, nombre: true, email: true } },
           asiento: { select: { id: true, fila: true, numero: true } },
           evento:  { select: { id: true, titulo: true } },
+          datosAsistente: true, // Incluir datos del asistente
         },
       });
 
@@ -57,12 +63,90 @@ export class AsistenciaService {
         },
       });
 
+      // 4. Actualizar datos del asistente
+      if (compra.datosAsistente) {
+        await (tx.datosAsistentes as any).update({
+          where: { compraId: compra.id },
+          data: {
+            asistenciaRegistrada: true,
+            fechaAsistencia: new Date(),
+          },
+        });
+      }
+
       return {
         asistenciaId: asistencia.id,
         usuario:      compra.usuario,
         evento:       compra.evento,
         asiento:      compra.asiento,
         ingresoEn:    asistencia.ingresoEn,
+        asistente: compra.datosAsistente, // Incluir datos del asistente
+      };
+    });
+  }
+
+  // Marca asistencia manualmente por ID de compra
+  async marcarAsistenciaManual(input: MarcarAsistenciaManualInput) {
+    const { compraId, adminId } = input;
+
+    return await prisma.$transaction(async (tx) => {
+      // 1. Buscar la compra
+      const compra = await tx.compra.findFirst({
+        where: { id: compraId },
+        include: {
+          usuario: { select: { id: true, nombre: true, email: true } },
+          asiento: { select: { id: true, fila: true, numero: true } },
+          evento:  { select: { id: true, titulo: true } },
+          datosAsistente: true,
+        },
+      });
+
+      if (!compra) {
+        throw new Error("Compra no encontrada");
+      }
+
+      if (compra.estadoPago !== "PAGADO") {
+        throw new Error("Compra no está pagada");
+      }
+
+      // Verificar si ya hay asistencia registrada
+      if (compra.qrCodeUsado) {
+        throw new Error("La asistencia ya fue registrada");
+      }
+
+      // 2. Marcar el QR como usado
+      await tx.compra.update({
+        where: { id: compraId },
+        data: { qrCodeUsado: true },
+      });
+
+      // 3. Crear registro de asistencia
+      const asistencia = await tx.asistencia.create({
+        data: {
+          compraId: compraId,
+          usuarioId: compra.usuarioId,
+          validadoPor: adminId,
+        },
+      });
+
+      // 4. Actualizar datos del asistente
+      if (compra.datosAsistente) {
+        await (tx.datosAsistentes as any).update({
+          where: { compraId: compraId },
+          data: {
+            asistenciaRegistrada: true,
+            fechaAsistencia: new Date(),
+          },
+        });
+      }
+
+      return {
+        asistenciaId: asistencia.id,
+        usuario:      compra.usuario,
+        evento:       compra.evento,
+        asiento:      compra.asiento,
+        ingresoEn:    asistencia.ingresoEn,
+        asistente: compra.datosAsistente,
       };
     });
   }
@@ -75,22 +159,26 @@ export class AsistenciaService {
         usuario: { select: { nombre: true, email: true, ci: true, agencia: true } },
         asiento: { select: { fila: true, numero: true } },
         asistencia: { select: { id: true, ingresoEn: true } },
+        datosAsistente: true, // Incluir datos del asistente
       },
       orderBy: { createdAt: "asc" },
     });
 
     return compras.map((c) => ({
       id:          c.id,
-      nombre:      c.usuario.nombre,
-      email:       c.usuario.email,
-      ci:          c.usuario.ci ?? "",
-      agencia:     c.usuario.agencia,
+      nombre:      c.datosAsistente?.nombre || c.usuario.nombre,
+      email:       c.datosAsistente?.email || c.usuario.email,
+      ci:          (c.datosAsistente?.documento || c.usuario.ci) ?? "",
+      agencia:     c.datosAsistente?.oficina || c.usuario.agencia || "N/A",
       asiento:     c.asiento
         ? `${c.asiento.fila}${c.asiento.numero}`
         : "N/A",
       asistencia:  c.asistencia ? "ASISTIO" : "PENDIENTE",
       horaCheckIn: c.asistencia?.ingresoEn ?? null,
       qrCode:      c.qrCode,
+      // Datos del asistente
+      asistenteRegistrada: (c.datosAsistente as any)?.asistenciaRegistrada || false,
+      fechaAsistencia: (c.datosAsistente as any)?.fechaAsistencia || null,
     }));
   }
 

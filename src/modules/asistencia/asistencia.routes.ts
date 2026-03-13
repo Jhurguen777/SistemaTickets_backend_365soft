@@ -10,6 +10,10 @@ const controller = new AsistenciaController();
 // Requiere: Admin autenticado
 router.post("/verificar-qr", authenticate, adminOnly, controller.verificarQR);
 
+// POST /api/asistencia/manual
+// Marca asistencia manualmente por ID de compra
+// Requiere: Admin autenticado
+router.post("/manual", authenticate, adminOnly, controller.marcarAsistenciaManual);
 
 // GET /api/asistencia/evento/:eventoId
 // Retorna la lista de todos los asistentes de un evento

@@ -83,4 +83,44 @@ export class AsistenciaController {
       res.status(500).json({ ok: false, mensaje: "Error interno del servidor" });
     }
   };
+
+  // POST /api/asistencia/manual
+  marcarAsistenciaManual = async (req: Request, res: Response): Promise<void> => {
+    try {
+      const { compraId, adminId } = req.body;
+
+      if (!compraId) {
+        res.status(400).json({
+          ok: false,
+          mensaje: "El campo compraId es requerido",
+        });
+        return;
+      }
+
+      const resultado = await asistenciaService.marcarAsistenciaManual({
+        compraId,
+        adminId: adminId || (req as any).user.id,
+      });
+
+      res.status(200).json({
+        ok: true,
+        mensaje: "Asistencia registrada correctamente",
+        data: resultado,
+      });
+    } catch (error: any) {
+      console.error("[AsistenciaController.marcarAsistenciaManual]", error);
+
+      const erroresConocidos = [
+        "Compra no encontrada",
+        "Compra no está pagada",
+        "La asistencia ya fue registrada",
+      ];
+
+      if (erroresConocidos.includes(error.message)) {
+        res.status(422).json({ ok: false, mensaje: error.message });
+      } else {
+        res.status(500).json({ ok: false, mensaje: "Error interno del servidor" });
+      }
+    }
+  };
 }

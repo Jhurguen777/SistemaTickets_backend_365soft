@@ -52,6 +52,16 @@ services:
       DATABASE_URL: postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB}?schema=public
     ports:
       - "127.0.0.1:3000:3000"  # Solo localhost — necesario para callback de Google OAuth
+    # VOLUMES PARA HOT RELOAD - Monta el código local en el contenedor
+    volumes:
+      - ./src:/app/src
+      - ./prisma:/app/prisma
+      - ./package.json:/app/package.json
+      - ./tsconfig.json:/app/tsconfig.json
+      - /app/node_modules  # Evita sobrescribir node_modules
+      - /app/dist  # Permite que el build local se use
+    # Comando para desarrollo con hot reload (sobrescribe el CMD del Dockerfile)
+    command: sh -c "npx prisma generate && npx prisma migrate deploy && npm run dev"
     healthcheck:
       test: ["CMD-SHELL", "wget -qO- http://localhost:3000/health || exit 1"]
       interval: 15s
