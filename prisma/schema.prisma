@@ -160,6 +160,38 @@ model QrPagos {
 }
 
 // ============================================
+// COMPROBANTES DE PAGO (EFECTIVO)
+// ============================================
+
+model ComprobantePago {
+  id               String    @id @default(uuid())
+  compraId         String    @unique
+  imagenUrl        String
+  nombreArchivo     String?
+  tipoArchivo      String?
+  tamanoBytes      Int?
+  mensajeRechazo    String?
+  fechaSubida      DateTime  @default(now())
+  fechaRevision     DateTime?
+  revisadoPor      String?
+  estado           EstadoComprobante @default(PENDIENTE)
+  createdAt        DateTime  @default(now())
+  updatedAt        DateTime  @updatedAt
+
+  compra           Compra    @relation(fields: [compraId], references: [id], onDelete: Cascade)
+
+  @@index([estado])
+  @@index([compraId])
+  @@map("comprobantes_pago")
+}
+
+enum EstadoComprobante {
+  PENDIENTE
+  APROBADO
+  RECHAZADO
+}
+
+// ============================================
 // DATOS DE ASISTENTES
 // ============================================
 
@@ -222,6 +254,7 @@ model Compra {
   asistencia      Asistencia?
   certificado     Certificado?
   datosAsistente  DatosAsistentes?
+  comprobantePago ComprobantePago?
 
   @@index([usuarioId])
   @@index([eventoId])
@@ -369,9 +402,11 @@ enum EstadoAsiento {
 
 enum EstadoPago {
   PENDIENTE
+  PENDIENTE_APROBACION
   PAGADO
   REEMBOLSADO
   FALLIDO
+  RECHAZADO
 }
 
 enum EstadoQr {

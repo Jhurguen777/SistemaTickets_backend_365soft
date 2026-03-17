@@ -18,6 +18,7 @@ import asistenciaRoutes from './modules/asistencia/asistencia.routes';
 import certificadoRoutes from './modules/certificados/certificados.routes';
 import adminRoutes from './modules/admin/admin.routes';
 import qrPagosRoutes from './modules/compras/qr-pagos.routes';
+import comprobantesPagoRoutes from './modules/compras/comprobantes-pago.routes'
 import comprasService from './modules/compras/compras.service';
 
 dotenv.config();
@@ -106,11 +107,13 @@ app.get('/health', (_req: Request, res: Response) => {
 });
 
 // ── API ROUTES ────────────────────────────────────────────────
+// ── API ROUTES ────────────────────────────────────────────────
 app.use('/api/auth', authRoutes);
 app.use('/api/eventos', eventoRoutes);
 app.use('/api/asientos', asientoRoutes(io));
-app.use('/api/compras', compraRoutes);
 app.use('/api/compras/qr', qrPagosRoutes);
+app.use('/api/compras/comprobantes-pago', comprobantesPagoRoutes);
+app.use('/api/compras', compraRoutes);
 app.use('/api/asistencia', asistenciaRoutes);
 app.use('/api/certificados', certificadoRoutes);
 app.use('/api/admin', adminRoutes);
@@ -121,6 +124,7 @@ console.log('  - GET/POST /api/eventos/* (Eventos)');
 console.log('  - GET/POST /api/asientos/* (Asientos)');
 console.log('  - GET/POST/DELETE /api/compras/* (Compras)');
 console.log('  - GET/POST/DELETE /api/compras/qr/* (QR Pagos)');
+console.log('  - GET/POST /api/compras/comprobantes-pago/* (Comprobantes Efectivo)');
 console.log('  - GET/POST /api/asistencia/* (Asistencia)');
 console.log('  - GET/POST /api/certificados/* (Certificados)');
 console.log('  - GET/POST /api/admin/* (Admin)');
