@@ -211,6 +211,24 @@ class ComprasService {
             }
           });
           nuevasCompras.push(compra);
+
+          // Crear registro en DatosAsistentes
+          if (asistente) {
+            const datosAsistentesData: any = {
+              compraId: compra.id,
+              nombre: asistente.nombre,
+              apellido: asistente.apellido,
+              asistenciaRegistrada: false
+            };
+            if (asistente.email) datosAsistentesData.email = asistente.email;
+            if (asistente.telefono) datosAsistentesData.telefono = asistente.telefono;
+            if (asistente.documento) datosAsistentesData.documento = asistente.documento;
+            if (asistente.oficina) datosAsistentesData.oficina = asistente.oficina;
+
+            await tx.datosAsistentes.create({
+              data: datosAsistentesData
+            });
+          }
         }
 
         return nuevasCompras;
@@ -811,6 +829,24 @@ class ComprasService {
             }
           });
           nuevasCompras.push(compra);
+
+          // Crear registro en DatosAsistentes
+          if (asistente) {
+            const datosAsistentesData: any = {
+              compraId: compra.id,
+              nombre: asistente.nombre,
+              apellido: asistente.apellido,
+              asistenciaRegistrada: false
+            };
+            if (asistente.email) datosAsistentesData.email = asistente.email;
+            if (asistente.telefono) datosAsistentesData.telefono = asistente.telefono;
+            if (asistente.documento) datosAsistentesData.documento = asistente.documento;
+            if (asistente.oficina) datosAsistentesData.oficina = asistente.oficina;
+
+            await tx.datosAsistentes.create({
+              data: datosAsistentesData
+            });
+          }
         }
         return nuevasCompras;
       }, { timeout: 10000 });
