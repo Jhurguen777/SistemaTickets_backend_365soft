@@ -112,7 +112,7 @@ class BancoQrUtil {
 
       const body: BancoGenerarQrRequest = {
         alias: params.alias,
-        callback: '000',  // Callback interno
+        callback: process.env.BANCO_QR_CALLBACK_URL || '',
         detalleGlosa: params.detalleGlosa,
         monto: params.monto,
         moneda: 'BOB',
@@ -217,7 +217,7 @@ class BancoQrUtil {
    * Validar respuesta del banco
    */
   validarRespuestaBanco(response: BancoGenerarQrResponse | BancoVerificarEstadoResponse): boolean {
-    return response.codigo === '0000';
+    return response.codigo === '0000' || response.codigo === 'OK';
   }
 
   /**

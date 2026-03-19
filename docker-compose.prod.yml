@@ -9,8 +9,7 @@ services:
       - .env
     volumes:
       - postgres_data:/var/lib/postgresql/data
-    ports:
-      - "127.0.0.1:5434:5432"
+    # Puerto NO expuesto al host — solo accesible dentro de la red Docker
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U $POSTGRES_USER"]
       interval: 10s
@@ -25,8 +24,7 @@ services:
     command: redis-server --appendonly yes
     volumes:
       - redis_data:/data
-    ports:
-      - "127.0.0.1:6379:6379"
+    # Puerto NO expuesto al host — solo accesible dentro de la red Docker
     healthcheck:
       test: ["CMD", "redis-cli", "ping"]
       interval: 10s
@@ -38,6 +36,7 @@ services:
     build:
       context: .
       dockerfile: Dockerfile
+      target: production
     container_name: tickets_backend
     restart: unless-stopped
     depends_on:
@@ -48,21 +47,10 @@ services:
     env_file:
       - .env
     environment:
-      # Se construye aquí para evitar duplicar credenciales en .env
       DATABASE_URL: postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB}?schema=public
       REDIS_URL: redis://redis:6379
-    ports:
-      - "127.0.0.1:3000:3000"  # Solo localhost — necesario para callback de Google OAuth
-    # VOLUMES PARA HOT RELOAD - Monta el código local en el contenedor
-    volumes:
-      - ./src:/app/src
-      - ./prisma:/app/prisma
-      - ./package.json:/app/package.json
-      - ./tsconfig.json:/app/tsconfig.json
-      - /app/node_modules  # Evita sobrescribir node_modules
-      - /app/dist  # Permite que el build local se use
-    # Comando para desarrollo con hot reload (sobrescribe el CMD del Dockerfile)
-    command: sh -c "npx prisma generate && npx prisma migrate deploy && npm run dev"
+      NODE_ENV: production
+    # Puerto NO expuesto directamente — nginx actúa como reverse proxy
     healthcheck:
       test: ["CMD-SHELL", "wget -qO- http://localhost:3000/health || exit 1"]
       interval: 15s
@@ -70,11 +58,12 @@ services:
       retries: 5
       start_period: 30s
 
-  # ─── Frontend (Vite → nginx) ─────────────────────────────────────
+  # ─── Frontend (nginx) ────────────────────────────────────────────
   frontend:
     build:
       context: ../SistemaTickets_365soft
       dockerfile: Dockerfile
+      target: production
       args:
         VITE_API_URL: ${VITE_API_URL:-/api}
         VITE_SOCKET_URL: ${VITE_SOCKET_URL:-}
@@ -85,20 +74,7 @@ services:
         condition: service_healthy
     ports:
       - "80:80"
-      # - "443:443"   # Descomentar al agregar SSL/TLS
-
-  # ─── pgAdmin ─────────────────────────────────────────────────────
-  pgadmin:
-    image: dpage/pgadmin4
-    container_name: tickets_pgadmin
-    restart: unless-stopped
-    environment:
-      PGADMIN_DEFAULT_EMAIL: admin@admin.com
-      PGADMIN_DEFAULT_PASSWORD: admin
-    ports:
-      - "5050:80"
-    depends_on:
-      - postgres
+      # - "443:443"  # Descomentar al agregar SSL/TLS con Certbot
 
 volumes:
   postgres_data:

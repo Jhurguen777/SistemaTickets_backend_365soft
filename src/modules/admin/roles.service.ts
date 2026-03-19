@@ -121,6 +121,43 @@ export const deleteRol = async (id: string) => {
   });
 };
 
+// Promover usuario existente a admin asignándole un rol
+export const promoverUsuario = async (
+  usuarioId: string,
+  tipoRol: 'SUPER_ADMIN' | 'GESTOR_EVENTOS' | 'GESTOR_REPORTES' | 'GESTOR_ASISTENCIA' | 'GESTOR_USUARIOS'
+) => {
+  const usuario = await prisma.usuario.findUnique({
+    where: { id: usuarioId },
+    select: { id: true, nombre: true, apellido: true, email: true, password: true, activo: true }
+  });
+
+  if (!usuario) throw new Error('Usuario no encontrado');
+  if (!usuario.activo) throw new Error('El usuario está inactivo');
+  if (!usuario.password) throw new Error('Esta cuenta se registró con Google y no puede acceder al panel admin. Usa "Crear Administrador" para crearle una cuenta separada.');
+
+  const existing = await prisma.adminRol.findUnique({ where: { email: usuario.email } });
+
+  if (existing) {
+    return await prisma.adminRol.update({
+      where: { email: usuario.email },
+      data: { tipoRol, estado: 'ACTIVO' },
+      select: { id: true, nombre: true, email: true, tipoRol: true, estado: true, createdAt: true }
+    });
+  }
+
+  const nombreCompleto = usuario.apellido ? `${usuario.nombre} ${usuario.apellido}` : usuario.nombre;
+  return await prisma.adminRol.create({
+    data: {
+      nombre: nombreCompleto,
+      email: usuario.email,
+      password: usuario.password,
+      tipoRol,
+      estado: 'ACTIVO'
+    },
+    select: { id: true, nombre: true, email: true, tipoRol: true, estado: true, createdAt: true }
+  });
+};
+
 // Actualizar último acceso
 export const updateUltimoAcceso = async (id: string) => {
   await prisma.adminRol.update({

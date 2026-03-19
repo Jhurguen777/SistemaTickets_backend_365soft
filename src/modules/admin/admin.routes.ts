@@ -12,6 +12,9 @@ import {
   getEventUsersHandler,
 } from './admin.controller';
 import rolesRoutes from './roles.routes';
+import { getActividades, getSesionesActivas } from './logs.service';
+import { Response } from 'express';
+import { AuthRequest } from '../../shared/middleware/auth';
 
 const router = Router();
 
@@ -32,6 +35,26 @@ router.get('/users/:userId/purchases', authenticate, adminOnly, getUserPurchases
 
 // Eventos
 router.get('/events/:eventId/users', authenticate, adminOnly, getEventUsersHandler);
+
+// Logs de actividad
+router.get('/logs', authenticate, adminOnly, async (req: AuthRequest, res: Response) => {
+  try {
+    const logs = await getActividades();
+    res.json({ success: true, data: logs });
+  } catch {
+    res.status(500).json({ error: 'Error al obtener logs' });
+  }
+});
+
+// Sesiones activas
+router.get('/sesiones', authenticate, adminOnly, async (req: AuthRequest, res: Response) => {
+  try {
+    const sesiones = await getSesionesActivas();
+    res.json({ success: true, data: sesiones });
+  } catch {
+    res.status(500).json({ error: 'Error al obtener sesiones' });
+  }
+});
 
 // Roles (Administradores)
 router.use('/roles', rolesRoutes);

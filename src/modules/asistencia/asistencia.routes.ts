@@ -1,35 +1,25 @@
 import { Router } from "express";
 import { AsistenciaController } from "./asistencia.controller";
-import { authenticate, adminOnly } from "../../shared/middleware/auth";
+import { authenticate, hasRole } from "../../shared/middleware/auth";
 
 const router = Router();
 const controller = new AsistenciaController();
 
+const asistenciaAccess = hasRole('GESTOR_EVENTOS', 'GESTOR_ASISTENCIA');
+
 // POST /api/asistencia/verificar-qr
-// Verifica el QR y registra el ingreso al evento
-// Requiere: Admin autenticado
-router.post("/verificar-qr", authenticate, adminOnly, controller.verificarQR);
+router.post("/verificar-qr", authenticate, asistenciaAccess, controller.verificarQR);
 
 // POST /api/asistencia/manual
-// Marca asistencia manualmente por ID de compra
-// Requiere: Admin autenticado
-router.post("/manual", authenticate, adminOnly, controller.marcarAsistenciaManual);
+router.post("/manual", authenticate, asistenciaAccess, controller.marcarAsistenciaManual);
 
 // GET /api/asistencia/evento/:eventoId
-// Retorna la lista de todos los asistentes de un evento
-// Requiere: Admin autenticado
-router.get("/evento/:eventoId", authenticate, adminOnly, controller.listarAsistentes);
-
+router.get("/evento/:eventoId", authenticate, asistenciaAccess, controller.listarAsistentes);
 
 // GET /api/asistencia/stats/:eventoId
-// Retorna estadísticas de asistencia del evento
-// Requiere: Admin autenticado
-router.get("/stats/:eventoId", authenticate, adminOnly, controller.obtenerStats);
-
+router.get("/stats/:eventoId", authenticate, asistenciaAccess, controller.obtenerStats);
 
 // GET /api/asistencia/exportar/:eventoId
-// Exporta la lista de asistentes en formato Excel (.xlsx)
-// Requiere: Admin autenticado
-router.get("/exportar/:eventoId", authenticate, adminOnly, controller.exportarExcel);
+router.get("/exportar/:eventoId", authenticate, asistenciaAccess, controller.exportarExcel);
 
 export default router;

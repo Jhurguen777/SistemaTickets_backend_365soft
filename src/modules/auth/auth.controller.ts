@@ -10,6 +10,7 @@ import {
   registerLocal as registerUserService,
 } from './auth.service';
 import prisma from '../../shared/config/database';
+import { logActividad } from '../admin/logs.service';
 
 // ── REGISTRO LOCAL ────────────────────────────────────
 export const register = async (req: AuthRequest, res: Response): Promise<void> => {
@@ -81,6 +82,15 @@ export const loginLocal = async (req: AuthRequest, res: Response): Promise<void>
       await prisma.adminRol.update({
         where: { id: adminUser.id },
         data: { ultimoAcceso: new Date() }
+      });
+
+      const ip = (req.headers['x-forwarded-for'] as string)?.split(',')[0] || req.socket.remoteAddress || 'desconocida';
+      await logActividad({
+        adminId: adminUser.id,
+        adminNombre: adminUser.nombre,
+        accion: 'LOGIN',
+        detalles: 'Inicio de sesión exitoso',
+        ip
       });
 
       const token = generateAuthToken({

@@ -447,7 +447,7 @@ class ComprasService {
 
       // 3. Actualizar estado local
       const estadoAnterior = qrPago.estado;
-      const estadoNuevo = responseBanco.objeto.estadoActual;
+      const estadoNuevo = responseBanco.objeto.estadoActual ?? qrPago.estado;
 
       console.log('🔄 Estado del QR:', {
         alias: qrPago.alias,
@@ -460,12 +460,12 @@ class ComprasService {
         where: { id: qrId },
         data: {
           estado: estadoNuevo as any,
-          numeroOrden: responseBanco.objeto.numeroOrdenOriginante,
-          nombreCliente: responseBanco.objeto.nombreCliente,
-          documentoCliente: responseBanco.objeto.documentoCliente,
-          cuentaCliente: responseBanco.objeto.cuentaCliente,
-          fechaproceso: responseBanco.objeto.fechaproceso
-            ? new Date(responseBanco.objeto.fechaproceso)
+          ...(responseBanco.objeto.numeroOrdenOriginante && { numeroOrden: responseBanco.objeto.numeroOrdenOriginante }),
+          ...(responseBanco.objeto.nombreCliente && { nombreCliente: responseBanco.objeto.nombreCliente }),
+          ...(responseBanco.objeto.documentoCliente && { documentoCliente: responseBanco.objeto.documentoCliente }),
+          ...(responseBanco.objeto.cuentaCliente && { cuentaCliente: responseBanco.objeto.cuentaCliente }),
+          fechaproceso: responseBanco.objeto.fechaProcesamiento
+            ? new Date(responseBanco.objeto.fechaProcesamiento)
             : null
         }
       });

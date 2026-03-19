@@ -50,8 +50,22 @@ model AdminRol {
   updatedAt    DateTime  @updatedAt
 
   plantillas   PlantillaCertificado[]
+  logs         LogActividad[]
 
   @@map("roles")
+}
+
+model LogActividad {
+  id          String   @id @default(uuid())
+  adminId     String
+  admin       AdminRol @relation(fields: [adminId], references: [id], onDelete: Cascade)
+  adminNombre String
+  accion      String
+  detalles    String
+  ip          String?
+  createdAt   DateTime @default(now())
+
+  @@map("logs_actividad")
 }
 
 // ============================================
@@ -200,7 +214,7 @@ model DatosAsistentes {
   compraId           String       @unique
   nombre             String
   apellido           String
-  email              String
+  email              String?
   telefono           String?
   documento          String?
   oficina            String?

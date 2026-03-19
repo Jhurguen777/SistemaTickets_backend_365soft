@@ -337,6 +337,7 @@ export const getUsersList = async () => {
       ci: true,
       telefono: true,
       agencia: true,
+      password: true,
       createdAt: true,
       _count: {
         select: {
@@ -363,10 +364,11 @@ export const getUsersList = async () => {
       ci: usuario.ci || 'No registrado',
       direccion: undefined,
       ciudad: usuario.agencia || undefined,
-      estado: 'ACTIVO', // Todos los usuarios están activos por ahora
+      estado: 'ACTIVO',
       totalCompras: usuario._count.compras,
       totalGastado,
-      ultimoAcceso: undefined, // No trackeamos último acceso todavía
+      ultimoAcceso: undefined,
+      hasPassword: !!usuario.password,
       createdAt: usuario.createdAt
     };
   });

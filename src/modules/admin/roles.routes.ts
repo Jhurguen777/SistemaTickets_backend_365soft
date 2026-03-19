@@ -6,7 +6,8 @@ import {
   getRol,
   postCreateRol,
   putUpdateRol,
-  deleteRolHandler
+  deleteRolHandler,
+  postPromoverUsuario
 } from './roles.controller';
 
 const router = Router();
@@ -16,10 +17,11 @@ router.use(authenticate);
 router.use(adminOnly);
 
 // CRUD de roles
-router.get('/', getRoles);                    // Obtener todos los roles
-router.get('/:id', getRol);                   // Obtener un rol por ID
-router.post('/', postCreateRol);              // Crear un nuevo rol
-router.put('/:id', putUpdateRol);             // Actualizar un rol
-router.delete('/:id', deleteRolHandler);      // Eliminar un rol
+router.get('/', getRoles);
+router.get('/:id', getRol);
+router.post('/', postCreateRol);
+router.post('/promover-usuario', postPromoverUsuario);
+router.put('/:id', putUpdateRol);
+router.delete('/:id', deleteRolHandler);
 
 export default router;

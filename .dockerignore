@@ -33,9 +33,14 @@ jest.config.*
 .DS_Store
 Thumbs.db
 
-# ── Documentación ─────────────────────────────────────────────────
+# ── Documentación y scripts ────────────────────────────────────────
 *.md
 README*
+docs/
+scripts/
+
+# ── Seed (no se ejecuta en producción) ────────────────────────────
+prisma/seed.ts
 
 # ── Temporales ─────────────────────────────────────────────────────
 tmp/
