@@ -36,7 +36,7 @@ services:
     build:
       context: .
       dockerfile: Dockerfile
-      target: production
+      target: production-final   # Sin devDependencies → imagen más liviana
     container_name: tickets_backend
     restart: unless-stopped
     depends_on:
@@ -58,24 +58,47 @@ services:
       retries: 5
       start_period: 30s
 
-  # ─── Frontend (nginx) ────────────────────────────────────────────
+  # ─── Frontend (nginx + SSL) ───────────────────────────────────────
   frontend:
     build:
       context: ../SistemaTickets_365soft
       dockerfile: Dockerfile
       target: production
       args:
-        VITE_API_URL: ${VITE_API_URL:-/api}
-        VITE_SOCKET_URL: ${VITE_SOCKET_URL:-}
+        # Valores tomados del .env (sin defaults hardcodeados)
+        - VITE_API_URL
+        - VITE_SOCKET_URL
     container_name: tickets_frontend
     restart: unless-stopped
     depends_on:
       backend:
         condition: service_healthy
+    environment:
+      DOMAIN: ${DOMAIN}
+    volumes:
+      # Config nginx de producción (sobreescribe la del build)
+      - ../SistemaTickets_365soft/nginx.prod.conf.template:/etc/nginx/templates/default.conf.template:ro
+      # Certs de Let's Encrypt (montados como solo lectura)
+      - certbot_conf:/etc/letsencrypt:ro
+      # Directorio webroot para renovaciones de certbot
+      - certbot_www:/var/www/certbot:ro
     ports:
       - "80:80"
-      # - "443:443"  # Descomentar al agregar SSL/TLS con Certbot
+      - "443:443"
+
+  # ─── Certbot (renovación automática de SSL) ──────────────────────
+  certbot:
+    image: certbot/certbot:latest
+    container_name: tickets_certbot
+    restart: unless-stopped
+    volumes:
+      - certbot_conf:/etc/letsencrypt
+      - certbot_www:/var/www/certbot
+    # Intenta renovar cada 12 horas (certbot solo renueva si faltan <30 días)
+    entrypoint: /bin/sh -c "trap exit TERM; while :; do certbot renew --quiet --webroot -w /var/www/certbot; sleep 12h & wait $${!}; done"
 
 volumes:
   postgres_data:
   redis_data:
+  certbot_conf:
+  certbot_www:
